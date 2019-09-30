@@ -64,7 +64,7 @@ func (peerster Peerster) listen(origin Origin) {
 			if err != nil {
 				fmt.Printf("Error: could not decode packet, reason: %s", err)
 			}
-			fmt.Printf("SIMPLE MESSAGE origin %s from %s contents %s", receivedPacket.Simple.OriginalName, receivedPacket.Simple.RelayPeerAddr, receivedPacket.Simple.Contents)
+			fmt.Printf("SIMPLE MESSAGE origin %s from %s contents %s \n", receivedPacket.Simple.OriginalName, receivedPacket.Simple.RelayPeerAddr, receivedPacket.Simple.Contents)
 			peerster.addToKnownPeers(receivedPacket.Simple.RelayPeerAddr)
 			receivedPacket.Simple.RelayPeerAddr = peerster.gossipAddr
 			err = peerster.sendToKnownPeers(*receivedPacket)
@@ -84,7 +84,7 @@ func (peerster *Peerster) addToKnownPeers(address string) {
 			return
 		}
 	}
-	peerster.knownPeers[len(peerster.knownPeers)] = address
+	peerster.knownPeers = append(peerster.knownPeers, address)
 }
 
 func (peerster Peerster) createMessage(msg string) *messaging.SimpleMessage {
@@ -97,8 +97,15 @@ func (peerster Peerster) createMessage(msg string) *messaging.SimpleMessage {
 
 // Sends a GossipPacket to all known peers
 func (peerster Peerster) sendToKnownPeers(packet messaging.GossipPacket) error {
+	fmt.Print("PEERS ")
 	for i := range peerster.knownPeers {
 		peer := peerster.knownPeers[i]
+		fmt.Print(peer)
+		if i < len(peerster.knownPeers)-1 {
+			fmt.Print(",")
+		} else {
+			fmt.Println()
+		}
 		if peer == peerster.gossipAddr {
 			break
 		}
@@ -136,8 +143,7 @@ func createPeerster() Peerster {
 
 func main() {
 	peerster := createPeerster()
-	fmt.Println(peerster.String())
+	//fmt.Println(peerster.String())
 	go peerster.listen(Server)
 	peerster.listen(Client)
-
 }

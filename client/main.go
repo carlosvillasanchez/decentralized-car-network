@@ -18,7 +18,7 @@ func (client PeersterClient) connect() (net.Conn, error) {
 }
 
 func createClient() PeersterClient {
-	UIPort := flag.String("UIPort", "10000", "port for the UI client (default '8080'")
+	UIPort := flag.String("UIPort", "8080", "port for the UI client (default '8080'")
 	msg := flag.String("msg", "Default message", "message to be sent")
 	flag.Parse()
 	return PeersterClient{
