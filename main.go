@@ -44,11 +44,11 @@ func (peerster Peerster) listen(origin Origin) {
 	}
 	for {
 		buffer := make([]byte, 1024)
-		n, b, err := conn.ReadFrom(buffer)
+		n, _, err := conn.ReadFrom(buffer)
 		if err != nil {
 			fmt.Println(err)
 		}
-		fmt.Println(n, b)
+		buffer = buffer[:n]
 		var packet messaging.GossipPacket
 		switch origin {
 		case Client:
@@ -56,18 +56,35 @@ func (peerster Peerster) listen(origin Origin) {
 			packet = messaging.GossipPacket{Simple: peerster.createMessage(string(buffer))}
 			err = peerster.sendToKnownPeers(packet)
 			if err != nil {
-				fmt.Printf("Error: could not send packet, reason: %s", err)
+				fmt.Printf("Error: could not send packet from client, reason: %s", err)
 			}
 		case Server:
-			fmt.Println("WHAT!!!", buffer)
-			r := messaging.GossipPacket{}
-			err := protobuf.Decode(buffer, &r)
+			receivedPacket := &messaging.GossipPacket{}
+			err := protobuf.Decode(buffer, receivedPacket)
 			if err != nil {
 				fmt.Printf("Error: could not decode packet, reason: %s", err)
 			}
-			fmt.Printf("SERVER MESSAGE, %s, %s, %s", r.Simple.RelayPeerAddr, r.Simple.OriginalName, r.Simple.Contents)
+			fmt.Printf("SIMPLE MESSAGE origin %s from %s contents %s", receivedPacket.Simple.OriginalName, receivedPacket.Simple.RelayPeerAddr, receivedPacket.Simple.Contents)
+			peerster.addToKnownPeers(receivedPacket.Simple.RelayPeerAddr)
+			receivedPacket.Simple.RelayPeerAddr = peerster.gossipAddr
+			err = peerster.sendToKnownPeers(*receivedPacket)
+			if err != nil {
+				fmt.Printf("Error: could not send packet from some other peer, reason: %s", err)
+			}
 		}
 	}
+}
+
+func (peerster *Peerster) addToKnownPeers(address string) {
+	if address == peerster.gossipAddr {
+		return
+	}
+	for i := range peerster.knownPeers {
+		if address == peerster.knownPeers[i] {
+			return
+		}
+	}
+	peerster.knownPeers[len(peerster.knownPeers)] = address
 }
 
 func (peerster Peerster) createMessage(msg string) *messaging.SimpleMessage {
@@ -81,8 +98,10 @@ func (peerster Peerster) createMessage(msg string) *messaging.SimpleMessage {
 // Sends a GossipPacket to all known peers
 func (peerster Peerster) sendToKnownPeers(packet messaging.GossipPacket) error {
 	for i := range peerster.knownPeers {
-		fmt.Println(peerster.knownPeers[i])
 		peer := peerster.knownPeers[i]
+		if peer == peerster.gossipAddr {
+			break
+		}
 		conn, err := net.Dial("udp", peer)
 		if err != nil {
 			return err
