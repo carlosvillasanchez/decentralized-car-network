@@ -14,7 +14,7 @@ type PeersterClient struct {
 }
 
 func (client PeersterClient) connect() (net.Conn, error) {
-	return net.Dial("udp", "127.0.0.1:"+client.UIPort)
+	return net.Dial("udp4", "127.0.0.1:"+client.UIPort)
 }
 
 func createClient() PeersterClient {
@@ -33,6 +33,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("Fatal error: PeersterClient was unable to connect. %s", err)
 	}
-	_, err = conn.Write([]byte(client.msg))
-	fmt.Println(err)
+	n, err := conn.Write([]byte(client.msg))
+	fmt.Println(err, n)
 }
