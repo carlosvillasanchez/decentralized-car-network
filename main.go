@@ -8,6 +8,7 @@ import (
 	"log"
 	"net"
 	"strings"
+	"time"
 )
 
 type Origin int
@@ -38,7 +39,7 @@ func (peerster Peerster) listen(origin Origin) {
 	case Server:
 		addr = peerster.gossipAddr
 	}
-	conn, err := net.ListenPacket("udp", addr)
+	conn, err := net.ListenPacket("udp4", addr)
 	if err != nil {
 		log.Fatalf("Error: could not listen. Origin: %s, error: %s", origin, err)
 	}
@@ -145,5 +146,6 @@ func main() {
 	peerster := createPeerster()
 	//fmt.Println(peerster.String())
 	go peerster.listen(Server)
-	peerster.listen(Client)
+	go peerster.listen(Client)
+	time.Sleep(3000 * time.Millisecond)
 }

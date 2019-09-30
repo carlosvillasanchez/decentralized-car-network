@@ -10,8 +10,8 @@ NC='\033[0m'
 DEBUG="false"
 
 outputFiles=()
-message=Weather_is_clear
-message2=Winter_is_coming
+message=Weyey
+message2=thisisok
 
 
 UIPort=12345
@@ -33,12 +33,15 @@ do
 		echo "$name running at UIPort $UIPort and gossipPort $gossipPort"
 	fi
 	UIPort=$(($UIPort+1))
+	echo $UIPort
+	echo $i
 	gossipPort=$(($gossipPort+1))
 	name=$(echo "$name" | tr "A-Y" "B-Z")
 done
 
-./client/client -UIPort=12349 -msg=$message
 ./client/client -UIPort=12346 -msg=$message2
+./client/client -UIPort=12349 -msg=$message
+
 sleep 3
 pkill -f Peerster
 
@@ -47,14 +50,17 @@ pkill -f Peerster
 failed="F"
 
 if !(grep -q "CLIENT MESSAGE $message" "E.out") ; then
+  echo "first one"
 	failed="T"
 fi
 
 if !(grep -q "CLIENT MESSAGE $message2" "B.out") ; then
+  echo "second one"
   failed="T"
 fi
 
 if [[ "$failed" == "T" ]] ; then
+  echo "okay"
 	echo -e "${RED}FAILED${NC}"
 fi
 
@@ -78,12 +84,15 @@ do
 	fi
 	gossipPort=$(($gossipPort+1))
 	if !(grep -q "$msgLine" "${outputFiles[$i]}") ; then
+	    echo "third"
    		failed="T"
 	fi
 	if !(grep -q "$peersLine" "${outputFiles[$i]}") ; then
+	      echo "fourth"
         failed="T"
     fi
 	if !(grep -q "$msgLine2" "${outputFiles[$i]}") ; then
+	      echo "fifth"
         failed="T"
     fi
 done
