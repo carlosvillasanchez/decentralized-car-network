@@ -28,7 +28,7 @@ type Peerster struct {
 
 func (peerster Peerster) String() string {
 	return fmt.Sprintf(
-		"UIPort: %s, gossipAddr: %s, knownPeers: %s, name: %s, simple: %s", peerster.UIPort, peerster.gossipAddr, peerster.knownPeers, peerster.name, peerster.simple)
+		"UIPort: %s, gossipAddr: %s, knownPeers: %s, name: %s, simple: %t", peerster.UIPort, peerster.gossipAddr, peerster.knownPeers, peerster.name, peerster.simple)
 }
 
 func (peerster Peerster) createConnection(origin Origin) (net.PacketConn, error) {
