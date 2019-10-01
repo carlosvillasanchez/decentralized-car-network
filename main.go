@@ -70,6 +70,21 @@ func (peerster Peerster) clientReceive(buffer []byte, packet messaging.GossipPac
 	}
 }
 
+func (peerster Peerster) handleIncomingRumor(rumor *messaging.RumorMessage) {
+	if rumor == nil {
+		return
+	}
+	peerster.addToWantStruct(rumor.Origin, rumor.ID)
+	peerster.updateWantStruct(rumor.Origin, rumor.ID)
+
+}
+
+func (peerster Peerster) handleIncomingStatusPacket(packet *messaging.StatusPacket) {
+	if packet == nil {
+		return
+	}
+}
+
 func (peerster Peerster) serverReceive(buffer []byte, originAddr net.UDPAddr, packet messaging.GossipPacket) {
 	receivedPacket := &messaging.GossipPacket{}
 	err := protobuf.Decode(buffer, receivedPacket)
@@ -84,7 +99,13 @@ func (peerster Peerster) serverReceive(buffer []byte, originAddr net.UDPAddr, pa
 	}
 	blacklist := []string{addr} // we won't send a message to these peers
 	peerster.addToKnownPeers(addr)
-	receivedPacket.Simple.RelayPeerAddr = peerster.gossipAddr
+	receivedPacket.Simple.RelayPeerAddr = peerster.gossipAddr //TODO this line might not be necessary after part1
+	if !peerster.simple {
+		peerster.handleIncomingRumor(receivedPacket.Rumor)
+		peerster.handleIncomingStatusPacket(receivedPacket.Status)
+	} else {
+
+	}
 	err = peerster.sendToKnownPeers(*receivedPacket, blacklist)
 	if err != nil {
 		fmt.Printf("Error: could not send packet from some other peer, reason: %s", err)
@@ -156,6 +177,20 @@ func (peerster *Peerster) addToKnownPeers(address string) {
 		}
 	}
 	peerster.knownPeers = append(peerster.knownPeers, address)
+}
+
+func (peerster *Peerster) hasReceivedRumor(origin string, seqId uint32) bool {
+	for i := range peerster.want {
+		peer := peerster.want[i]
+		if peer.Identifier == origin {
+			if seqId < peer.NextID {
+				return true
+			} else {
+				return false
+			}
+		}
+	}
+	return false
 }
 
 // Creates a new SimpleMessage, automatically filling out the name and relaypeeraddr fields
