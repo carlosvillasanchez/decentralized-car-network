@@ -7,8 +7,8 @@ import (
 	"github.com/tormey97/Peerster/messaging"
 	"log"
 	"net"
+	"strconv"
 	"strings"
-	"time"
 )
 
 type Origin int
@@ -24,6 +24,7 @@ type Peerster struct {
 	knownPeers []string
 	name       string
 	simple     bool
+	want       []messaging.PeerStatus
 }
 
 func (peerster Peerster) String() string {
@@ -31,7 +32,7 @@ func (peerster Peerster) String() string {
 		"UIPort: %s, gossipAddr: %s, knownPeers: %s, name: %s, simple: %t", peerster.UIPort, peerster.gossipAddr, peerster.knownPeers, peerster.name, peerster.simple)
 }
 
-func (peerster Peerster) createConnection(origin Origin) (net.PacketConn, error) {
+func (peerster Peerster) createConnection(origin Origin) (net.UDPConn, error) {
 	var addr string
 	switch origin {
 	case Client:
@@ -39,37 +40,50 @@ func (peerster Peerster) createConnection(origin Origin) (net.PacketConn, error)
 	case Server:
 		addr = peerster.gossipAddr
 	}
-	return net.ListenPacket("udp4", addr)
+	udpAddr, err := net.ResolveUDPAddr("udp4", addr)
+	if err != nil {
+		return net.UDPConn{}, err
+	}
+	udpConn, err := net.ListenUDP("udp4", udpAddr)
+	if err != nil {
+		return net.UDPConn{}, err
+	}
+	return *udpConn, nil
 }
 
-func readFromConnection(conn net.PacketConn) ([]byte, error) {
+func readFromConnection(conn net.UDPConn) ([]byte, *net.UDPAddr, error) {
 	buffer := make([]byte, 1024)
-	n, _, err := conn.ReadFrom(buffer)
+	n, originAddr, err := conn.ReadFromUDP(buffer)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	buffer = buffer[:n]
-	return buffer, nil
+	return buffer, originAddr, nil
 }
 
 func (peerster Peerster) clientReceive(buffer []byte, packet messaging.GossipPacket) {
 	fmt.Println("CLIENT MESSAGE " + string(buffer))
-	packet = messaging.GossipPacket{Simple: peerster.createMessage(string(buffer))}
+	packet = messaging.GossipPacket{Simple: peerster.createSimpleMessage(string(buffer))}
 	err := peerster.sendToKnownPeers(packet, []string{})
 	if err != nil {
 		fmt.Printf("Error: could not send packet from client, reason: %s", err)
 	}
 }
 
-func (peerster Peerster) serverReceive(buffer []byte, packet messaging.GossipPacket) {
+func (peerster Peerster) serverReceive(buffer []byte, originAddr net.UDPAddr, packet messaging.GossipPacket) {
 	receivedPacket := &messaging.GossipPacket{}
 	err := protobuf.Decode(buffer, receivedPacket)
 	if err != nil {
 		fmt.Printf("Error: could not decode packet, reason: %s", err)
 	}
+	//TODO Handle SimpleMessage and Rumor cases differently. If it's a simplemessage, the relay origin addr is probably inside the message
 	fmt.Printf("SIMPLE MESSAGE origin %s from %s contents %s \n", receivedPacket.Simple.OriginalName, receivedPacket.Simple.RelayPeerAddr, receivedPacket.Simple.Contents)
-	blacklist := []string{receivedPacket.Simple.RelayPeerAddr}
-	peerster.addToKnownPeers(receivedPacket.Simple.RelayPeerAddr)
+	addr := originAddr.IP.String() + ":" + strconv.Itoa(originAddr.Port)
+	if receivedPacket.Simple.RelayPeerAddr != "" {
+		addr = receivedPacket.Simple.RelayPeerAddr
+	}
+	blacklist := []string{addr} // we won't send a message to these peers
+	peerster.addToKnownPeers(addr)
 	receivedPacket.Simple.RelayPeerAddr = peerster.gossipAddr
 	err = peerster.sendToKnownPeers(*receivedPacket, blacklist)
 	if err != nil {
@@ -85,7 +99,7 @@ func (peerster Peerster) listen(origin Origin) {
 	}
 
 	for {
-		buffer, err := readFromConnection(conn)
+		buffer, originAddr, err := readFromConnection(conn)
 		if err != nil {
 			log.Printf("Could not read from connection, origin: %s, reason: %s", origin, err)
 			break
@@ -95,11 +109,43 @@ func (peerster Peerster) listen(origin Origin) {
 		case Client:
 			peerster.clientReceive(buffer, packet)
 		case Server:
-			peerster.serverReceive(buffer, packet)
+			peerster.serverReceive(buffer, *originAddr, packet)
 		}
 	}
 }
 
+func (peerster *Peerster) registerNewPeer(address, peerIdentifier string, initialSeqId uint32) {
+	peerster.addToKnownPeers(address)
+	peerster.addToWantStruct(peerIdentifier, initialSeqId)
+}
+
+// Adds a new peer (given its unique identifier) to the peerster's want structure.
+func (peerster *Peerster) addToWantStruct(peerIdentifier string, initialSeqId uint32) {
+	newWant := append(peerster.want, messaging.PeerStatus{
+		Identifier: peerIdentifier,
+		NextID:     initialSeqId + 1,
+	})
+	peerster.want = newWant
+}
+
+// Called when a message is received. If the nextId of the specified peer is the same as the receivedSeqID, then nextId will be incremented
+// and true will be returned - otherwise, the nextId will not be changed and false will be returned.
+func (peerster *Peerster) updateWantStruct(peerIdentifier string, receivedSeqId uint32) bool {
+	for i := range peerster.want {
+		peer := peerster.want[i]
+		if peer.Identifier != peerIdentifier {
+			continue
+		}
+		if peer.NextID == receivedSeqId {
+			peer.NextID = peer.NextID + 1
+			return true
+		}
+		break
+	}
+	return false
+}
+
+// Adds the new address to the list of known peers - if it's already there, nothing happens
 func (peerster *Peerster) addToKnownPeers(address string) {
 	if address == peerster.gossipAddr {
 		return
@@ -112,7 +158,8 @@ func (peerster *Peerster) addToKnownPeers(address string) {
 	peerster.knownPeers = append(peerster.knownPeers, address)
 }
 
-func (peerster Peerster) createMessage(msg string) *messaging.SimpleMessage {
+// Creates a new SimpleMessage, automatically filling out the name and relaypeeraddr fields
+func (peerster Peerster) createSimpleMessage(msg string) *messaging.SimpleMessage {
 	return &messaging.SimpleMessage{
 		OriginalName:  peerster.name,
 		RelayPeerAddr: peerster.gossipAddr,
@@ -120,6 +167,7 @@ func (peerster Peerster) createMessage(msg string) *messaging.SimpleMessage {
 	}
 }
 
+// Prints out the list of known peers in a formatted fashion
 func (peerster Peerster) listPeers() {
 	for i := range peerster.knownPeers {
 		peer := peerster.knownPeers[i]
@@ -150,7 +198,6 @@ func (peerster Peerster) sendToKnownPeers(packet messaging.GossipPacket, blackli
 		if blacklisted {
 			break
 		}
-
 		conn, err := net.Dial("udp4", peer)
 		if err != nil {
 			return err
@@ -187,6 +234,5 @@ func main() {
 	peerster := createPeerster()
 	//fmt.Println(peerster.String())
 	go peerster.listen(Server)
-	go peerster.listen(Client)
-	time.Sleep(3000 * time.Millisecond)
+	peerster.listen(Client)
 }

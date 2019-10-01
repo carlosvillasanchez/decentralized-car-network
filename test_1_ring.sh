@@ -7,7 +7,7 @@ cd ..
 
 RED='\033[0;31m'
 NC='\033[0m'
-DEBUG="false"
+DEBUG="true"
 
 outputFiles=()
 message=Weyey
@@ -43,7 +43,7 @@ done
 ./client/client -UIPort=12349 -msg=$message
 
 sleep 3
-pkill -f Peerster
+taskkill -F -IM Peerster.exe
 
 
 #testing
