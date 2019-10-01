@@ -55,7 +55,7 @@ func (peerster Peerster) listen(origin Origin) {
 		case Client:
 			fmt.Println("CLIENT MESSAGE " + string(buffer))
 			packet = messaging.GossipPacket{Simple: peerster.createMessage(string(buffer))}
-			err = peerster.sendToKnownPeers(packet)
+			err = peerster.sendToKnownPeers(packet, []string{})
 			if err != nil {
 				fmt.Printf("Error: could not send packet from client, reason: %s", err)
 			}
@@ -67,8 +67,9 @@ func (peerster Peerster) listen(origin Origin) {
 			}
 			fmt.Printf("SIMPLE MESSAGE origin %s from %s contents %s \n", receivedPacket.Simple.OriginalName, receivedPacket.Simple.RelayPeerAddr, receivedPacket.Simple.Contents)
 			oldAddr := receivedPacket.Simple.RelayPeerAddr
+			blacklist := []string{oldAddr}
 			receivedPacket.Simple.RelayPeerAddr = peerster.gossipAddr
-			err = peerster.sendToKnownPeers(*receivedPacket)
+			err = peerster.sendToKnownPeers(*receivedPacket, blacklist)
 			if err != nil {
 				fmt.Printf("Error: could not send packet from some other peer, reason: %s", err)
 			}
@@ -113,12 +114,24 @@ func (peerster Peerster) listPeers() {
 }
 
 // Sends a GossipPacket to all known peers
-func (peerster Peerster) sendToKnownPeers(packet messaging.GossipPacket) error {
+func (peerster Peerster) sendToKnownPeers(packet messaging.GossipPacket, blacklist []string) error {
+
 	for i := range peerster.knownPeers {
 		peer := peerster.knownPeers[i]
 		if peer == peerster.gossipAddr {
 			break
 		}
+		blacklisted := false
+		for j := range blacklist {
+			if peer == blacklist[j] {
+				blacklisted = true
+				break
+			}
+		}
+		if blacklisted {
+			break
+		}
+
 		conn, err := net.Dial("udp4", peer)
 		if err != nil {
 			return err
