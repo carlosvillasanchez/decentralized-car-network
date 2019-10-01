@@ -31,7 +31,7 @@ func (peerster Peerster) String() string {
 		"UIPort: %s, gossipAddr: %s, knownPeers: %s, name: %s, simple: %s", peerster.UIPort, peerster.gossipAddr, peerster.knownPeers, peerster.name, peerster.simple)
 }
 
-func (peerster Peerster) listen(origin Origin) {
+func (peerster Peerster) createConnection(origin Origin) (net.PacketConn, error) {
 	var addr string
 	switch origin {
 	case Client:
@@ -39,49 +39,69 @@ func (peerster Peerster) listen(origin Origin) {
 	case Server:
 		addr = peerster.gossipAddr
 	}
-	conn, err := net.ListenPacket("udp4", addr)
+	return net.ListenPacket("udp4", addr)
+}
+
+func readFromConnection(conn net.PacketConn) ([]byte, error) {
+	buffer := make([]byte, 1024)
+	n, _, err := conn.ReadFrom(buffer)
+	if err != nil {
+		return nil, err
+	}
+	buffer = buffer[:n]
+	return buffer, nil
+}
+
+func (peerster Peerster) clientReceive(buffer []byte, packet messaging.GossipPacket) {
+	fmt.Println("CLIENT MESSAGE " + string(buffer))
+	packet = messaging.GossipPacket{Simple: peerster.createMessage(string(buffer))}
+	err := peerster.sendToKnownPeers(packet, []string{})
+	if err != nil {
+		fmt.Printf("Error: could not send packet from client, reason: %s", err)
+	}
+}
+
+func (peerster Peerster) serverReceive(buffer []byte, packet messaging.GossipPacket) {
+	receivedPacket := &messaging.GossipPacket{}
+	err := protobuf.Decode(buffer, receivedPacket)
+	if err != nil {
+		fmt.Printf("Error: could not decode packet, reason: %s", err)
+	}
+	fmt.Printf("SIMPLE MESSAGE origin %s from %s contents %s \n", receivedPacket.Simple.OriginalName, receivedPacket.Simple.RelayPeerAddr, receivedPacket.Simple.Contents)
+	blacklist := []string{receivedPacket.Simple.RelayPeerAddr}
+	peerster.addToKnownPeers(receivedPacket.Simple.RelayPeerAddr)
+	receivedPacket.Simple.RelayPeerAddr = peerster.gossipAddr
+	err = peerster.sendToKnownPeers(*receivedPacket, blacklist)
+	if err != nil {
+		fmt.Printf("Error: could not send packet from some other peer, reason: %s", err)
+	}
+	peerster.listPeers()
+}
+
+func (peerster Peerster) listen(origin Origin) {
+	conn, err := peerster.createConnection(origin)
 	if err != nil {
 		log.Fatalf("Error: could not listen. Origin: %s, error: %s", origin, err)
 	}
+
 	for {
-		buffer := make([]byte, 1024)
-		n, _, err := conn.ReadFrom(buffer)
+		buffer, err := readFromConnection(conn)
 		if err != nil {
-			fmt.Println(err)
+			log.Printf("Could not read from connection, origin: %s, reason: %s", origin, err)
+			break
 		}
-		buffer = buffer[:n]
 		var packet messaging.GossipPacket
 		switch origin {
 		case Client:
-			fmt.Println("CLIENT MESSAGE " + string(buffer))
-			packet = messaging.GossipPacket{Simple: peerster.createMessage(string(buffer))}
-			err = peerster.sendToKnownPeers(packet, []string{})
-			if err != nil {
-				fmt.Printf("Error: could not send packet from client, reason: %s", err)
-			}
+			peerster.clientReceive(buffer, packet)
 		case Server:
-			receivedPacket := &messaging.GossipPacket{}
-			err := protobuf.Decode(buffer, receivedPacket)
-			if err != nil {
-				fmt.Printf("Error: could not decode packet, reason: %s", err)
-			}
-			fmt.Printf("SIMPLE MESSAGE origin %s from %s contents %s \n", receivedPacket.Simple.OriginalName, receivedPacket.Simple.RelayPeerAddr, receivedPacket.Simple.Contents)
-			oldAddr := receivedPacket.Simple.RelayPeerAddr
-			blacklist := []string{oldAddr}
-			receivedPacket.Simple.RelayPeerAddr = peerster.gossipAddr
-			err = peerster.sendToKnownPeers(*receivedPacket, blacklist)
-			if err != nil {
-				fmt.Printf("Error: could not send packet from some other peer, reason: %s", err)
-			}
-			peerster.addToKnownPeers(oldAddr)
-			peerster.listPeers()
+			peerster.serverReceive(buffer, packet)
 		}
 	}
 }
 
 func (peerster *Peerster) addToKnownPeers(address string) {
 	if address == peerster.gossipAddr {
-
 		return
 	}
 	for i := range peerster.knownPeers {
@@ -113,9 +133,8 @@ func (peerster Peerster) listPeers() {
 
 }
 
-// Sends a GossipPacket to all known peers
+// Sends a GossipPacket to all known peers.
 func (peerster Peerster) sendToKnownPeers(packet messaging.GossipPacket, blacklist []string) error {
-
 	for i := range peerster.knownPeers {
 		peer := peerster.knownPeers[i]
 		if peer == peerster.gossipAddr {
