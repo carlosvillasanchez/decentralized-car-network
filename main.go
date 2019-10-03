@@ -1,14 +1,17 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"github.com/dedis/protobuf"
 	"github.com/tormey97/Peerster/messaging"
 	"log"
+	"math/rand"
 	"net"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type Origin int
@@ -61,12 +64,22 @@ func readFromConnection(conn net.UDPConn) ([]byte, *net.UDPAddr, error) {
 	return buffer, originAddr, nil
 }
 
-func (peerster Peerster) clientReceive(buffer []byte, packet messaging.GossipPacket) {
+func (peerster Peerster) clientReceive(buffer []byte) {
 	fmt.Println("CLIENT MESSAGE " + string(buffer))
-	packet = messaging.GossipPacket{Simple: peerster.createSimpleMessage(string(buffer))}
-	err := peerster.sendToKnownPeers(packet, []string{})
-	if err != nil {
-		fmt.Printf("Error: could not send packet from client, reason: %s", err)
+
+	if peerster.simple {
+		packet := messaging.GossipPacket{Simple: peerster.createSimpleMessage(string(buffer))}
+		err := peerster.sendToKnownPeers(packet, []string{})
+		if err != nil {
+			fmt.Printf("Error: could not send receivedPacket from client, reason: %s", err)
+		}
+	} else {
+		rumor := messaging.RumorMessage{
+			Origin: peerster.name,
+			ID:     2,
+			Text:   string(buffer),
+		}
+		peerster.handleIncomingRumor(&rumor)
 	}
 }
 
@@ -75,7 +88,13 @@ func (peerster Peerster) handleIncomingRumor(rumor *messaging.RumorMessage) {
 		return
 	}
 	peerster.addToWantStruct(rumor.Origin, rumor.ID)
-	peerster.updateWantStruct(rumor.Origin, rumor.ID)
+	isNew := peerster.updateWantStruct(rumor.Origin, rumor.ID)
+	if isNew {
+		err := peerster.sendToRandomPeer(messaging.GossipPacket{Rumor: rumor}, []string{})
+		if err != nil {
+			fmt.Printf("Warning: Could not send to random peer. Reason: %s", err)
+		}
+	}
 
 }
 
@@ -85,7 +104,23 @@ func (peerster Peerster) handleIncomingStatusPacket(packet *messaging.StatusPack
 	}
 }
 
-func (peerster Peerster) serverReceive(buffer []byte, originAddr net.UDPAddr, packet messaging.GossipPacket) {
+func (peerster Peerster) chooseRandomPeer() (string, error) {
+	var validPeers []string
+	for i := range peerster.knownPeers {
+		peer := peerster.knownPeers[i]
+		if peer != peerster.gossipAddr {
+			validPeers = append(validPeers, peer)
+		}
+	}
+	s := rand.NewSource(time.Now().Unix())
+	r := rand.New(s)
+	if validPeers == nil {
+		return "", errors.New("slice of valid peers is empty/nil")
+	}
+	return validPeers[r.Intn(len(validPeers))], nil
+}
+
+func (peerster Peerster) serverReceive(buffer []byte, originAddr net.UDPAddr) {
 	receivedPacket := &messaging.GossipPacket{}
 	err := protobuf.Decode(buffer, receivedPacket)
 	if err != nil {
@@ -125,12 +160,11 @@ func (peerster Peerster) listen(origin Origin) {
 			log.Printf("Could not read from connection, origin: %s, reason: %s", origin, err)
 			break
 		}
-		var packet messaging.GossipPacket
 		switch origin {
 		case Client:
-			peerster.clientReceive(buffer, packet)
+			peerster.clientReceive(buffer)
 		case Server:
-			peerster.serverReceive(buffer, *originAddr, packet)
+			peerster.serverReceive(buffer, *originAddr)
 		}
 	}
 }
@@ -216,6 +250,35 @@ func (peerster Peerster) listPeers() {
 
 }
 
+func (peerster Peerster) sendToPeer(peer string, packet messaging.GossipPacket, blacklist []string) error {
+	for j := range blacklist {
+		if peer == blacklist[j] {
+			return fmt.Errorf("peer %q is blacklisted")
+		}
+	}
+	conn, err := net.Dial("udp4", peer)
+	if err != nil {
+		return err
+	}
+	packetBytes, err := protobuf.Encode(&packet)
+	if err != nil {
+		return err
+	}
+	_, err = conn.Write(packetBytes)
+	if err != nil {
+		return err
+	}
+}
+
+func (peerster Peerster) sendToRandomPeer(packet messaging.GossipPacket, blacklist []string) error {
+	peer, err := peerster.chooseRandomPeer()
+	if err != nil {
+		fmt.Printf("Could not choose random peer, reason: %s", err)
+		return err
+	}
+	return peerster.sendToPeer(peer, packet, blacklist)
+}
+
 // Sends a GossipPacket to all known peers.
 func (peerster Peerster) sendToKnownPeers(packet messaging.GossipPacket, blacklist []string) error {
 	for i := range peerster.knownPeers {
@@ -223,27 +286,9 @@ func (peerster Peerster) sendToKnownPeers(packet messaging.GossipPacket, blackli
 		if peer == peerster.gossipAddr {
 			break
 		}
-		blacklisted := false
-		for j := range blacklist {
-			if peer == blacklist[j] {
-				blacklisted = true
-				break
-			}
-		}
-		if blacklisted {
-			break
-		}
-		conn, err := net.Dial("udp4", peer)
+		err := peerster.sendToPeer(peer, packet, blacklist)
 		if err != nil {
-			return err
-		}
-		packetBytes, err := protobuf.Encode(&packet)
-		if err != nil {
-			return err
-		}
-		_, err = conn.Write(packetBytes)
-		if err != nil {
-			return err
+			fmt.Printf("Could not send to peer %q, reason: %s", peer, err)
 		}
 	}
 	return nil
