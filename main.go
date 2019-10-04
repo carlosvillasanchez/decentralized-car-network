@@ -34,9 +34,9 @@ type Peerster struct {
 	Name               string
 	Simple             bool
 	Want               []messaging.PeerStatus
-	MsgSeqNumber       int
+	MsgSeqNumber       uint32
 	ReceivedMessages   map[string][]messaging.RumorMessage
-	RumormongeringWith map[string][]bool
+	RumormongeringWith map[string][]bool //TODO is this necessary?
 }
 
 func (peerster Peerster) String() string {
@@ -85,9 +85,10 @@ func (peerster Peerster) clientReceive(buffer []byte) {
 	} else {
 		rumor := messaging.RumorMessage{
 			Origin: peerster.Name,
-			ID:     2,
+			ID:     peerster.MsgSeqNumber,
 			Text:   string(buffer),
 		}
+		peerster.MsgSeqNumber = peerster.MsgSeqNumber + 1
 		peerster.handleIncomingRumor(&rumor, net.UDPAddr{})
 	}
 }
@@ -141,11 +142,19 @@ func (peerster Peerster) handleIncomingStatusPacket(packet *messaging.StatusPack
 
 		statusPacket := messaging.StatusPacket{Want: peerster.Want}
 		gossipPacket := messaging.GossipPacket{Status: &statusPacket}
+		synced := true
 		if myWant.NextID > otherPeerWant.NextID {
-			// He's out of date, we transmit messages hes missing
+			// He's out of date, we transmit messages hes missing (for this particular peer)
 			messages := peerster.getMissingMessages(otherPeerWant.NextID, myWant.NextID, otherPeerWant.Identifier)
 			nextMsg := messages[0]
-			// peerster.send(nextMsg, addr)
+			err := peerster.sendToPeer("", messaging.GossipPacket{
+				Rumor: &nextMsg,
+			}, []string{})
+			if err != nil {
+				fmt.Printf("Could not send missing rumor to peer, reason: %s", err)
+			}
+			synced = false
+			break
 			//TODO what do i do with the messages, apparently you send "one" (in bold) message.
 			// but that's weird, no? what about hte rest of the messages
 
@@ -154,13 +163,18 @@ func (peerster Peerster) handleIncomingStatusPacket(packet *messaging.StatusPack
 			// is it enough to just have a boolean "rumormongering-with" flag? problem is that this means you would treat
 			// every statuspacket coming from a specific peer as if he is not rumormongering with you, but is that necessarily
 			// the truth?
-		} else if myWant.NextID == otherPeerWant.NextID {
-			// We are up to date, so we ACK with a statuspacket? not sure
-			/*TODO ok so apparently: sending peer (rumormonger) flips a coin, either picks a random peer to send
-			the rumor message to or does nothing*/
 		} else if myWant.NextID < otherPeerWant.NextID {
 			// I'm out of date, we send him our status packet saying we are OOD, he should send us msgs
-			peerster.sendToPeer(originAddr.String(), gossipPacket, []string{})
+			err := peerster.sendToPeer(originAddr.String(), gossipPacket, []string{})
+			if err != nil {
+				fmt.Printf("Could not send statuspacket. Reason: %s", err)
+			}
+			synced = false
+		}
+
+		if synced {
+			fmt.Printf("SYCNED. Flipping coin.")
+			//TODO coinflip
 		}
 	}
 }
@@ -187,23 +201,23 @@ func (peerster Peerster) serverReceive(buffer []byte, originAddr net.UDPAddr) {
 	if err != nil {
 		fmt.Printf("Error: could not decode packet, reason: %s", err)
 	}
-	//TODO Handle SimpleMessage and Rumor cases differently. If it's a simplemessage, the relay origin addr is probably inside the message
-	fmt.Printf("SIMPLE MESSAGE origin %s from %s contents %s \n", receivedPacket.Simple.OriginalName, receivedPacket.Simple.RelayPeerAddr, receivedPacket.Simple.Contents)
 	addr := originAddr.IP.String() + ":" + strconv.Itoa(originAddr.Port)
 	if receivedPacket.Simple.RelayPeerAddr != "" {
 		addr = receivedPacket.Simple.RelayPeerAddr
 	}
-	blacklist := []string{addr} // we won't send a message to these peers
 	peerster.addToKnownPeers(addr)
-	receivedPacket.Simple.RelayPeerAddr = peerster.GossipAddress //TODO this line might not be necessary after part1
 	if !peerster.Simple {
 		peerster.handleIncomingRumor(receivedPacket.Rumor, originAddr)
 		peerster.handleIncomingStatusPacket(receivedPacket.Status, originAddr)
 	} else {
-	}
-	err = peerster.sendToKnownPeers(*receivedPacket, blacklist)
-	if err != nil {
-		fmt.Printf("Error: could not send packet from some other peer, reason: %s", err)
+		//TODO Handle SimpleMessage and Rumor cases differently. If it's a simplemessage, the relay origin addr is probably inside the message
+		fmt.Printf("SIMPLE MESSAGE origin %s from %s contents %s \n", receivedPacket.Simple.OriginalName, receivedPacket.Simple.RelayPeerAddr, receivedPacket.Simple.Contents)
+		blacklist := []string{addr}                                  // we won't send a message to these peers
+		receivedPacket.Simple.RelayPeerAddr = peerster.GossipAddress //TODO this line might not be necessary after part1
+		err = peerster.sendToKnownPeers(*receivedPacket, blacklist)
+		if err != nil {
+			fmt.Printf("Error: could not send packet from some other peer, reason: %s", err)
+		}
 	}
 	peerster.listPeers()
 }
@@ -241,10 +255,8 @@ func (peerster *Peerster) addToReceivedMessages(rumor messaging.RumorMessage) bo
 		peerster.ReceivedMessages[rumor.Origin] = []messaging.RumorMessage{}
 		messagesFromPeer = peerster.ReceivedMessages[rumor.Origin]
 	}
-	message := messagesFromPeer[rumor.ID]
-	if message != (messaging.RumorMessage{}) {
-		// zero value, so this message is not received before
-		messagesFromPeer[rumor.ID] = rumor
+	if int(rumor.ID) == len(messagesFromPeer) {
+		peerster.ReceivedMessages[rumor.Origin] = append(peerster.ReceivedMessages[rumor.Origin], rumor)
 		return true
 	}
 	return false
@@ -344,6 +356,7 @@ func (peerster Peerster) sendToPeer(peer string, packet messaging.GossipPacket, 
 	if err != nil {
 		return err
 	}
+	return nil
 }
 
 func (peerster Peerster) sendToRandomPeer(packet messaging.GossipPacket, blacklist []string) error {
@@ -372,17 +385,21 @@ func (peerster Peerster) sendToKnownPeers(packet messaging.GossipPacket, blackli
 
 func createPeerster() Peerster {
 	UIPort := flag.String("UIPort", "8080", "the port the client uses to communicate with peerster")
-	gossipAddr := flag.String("GossipAddress", "127.0.0.1:5000", "the address of the peerster")
-	name := flag.String("Name", "nodeA", "the Name of the node")
+	gossipAddr := flag.String("gossipAddr", "127.0.0.1:5000", "the address of the peerster")
+	name := flag.String("name", "nodeA", "the Name of the node")
 	peers := flag.String("peers", "", "known peers")
-	simple := flag.Bool("Simple", true, "Simple mode")
+	simple := flag.Bool("simple", false, "Simple mode")
 	flag.Parse()
 	return Peerster{
-		UIPort:        *UIPort,
-		GossipAddress: *gossipAddr,
-		KnownPeers:    strings.Split(*peers, ","),
-		Name:          *name,
-		Simple:        *simple,
+		UIPort:             *UIPort,
+		GossipAddress:      *gossipAddr,
+		KnownPeers:         strings.Split(*peers, ","),
+		Name:               *name,
+		Simple:             *simple,
+		RumormongeringWith: map[string][]bool{},
+		ReceivedMessages:   map[string][]messaging.RumorMessage{},
+		MsgSeqNumber:       1,
+		Want:               []messaging.PeerStatus{},
 	}
 }
 
