@@ -21,18 +21,27 @@ const (
 	Server
 )
 
+//TODO big monolith split up pls
+
+//TODO should we create a wrapper struct for other known peers?
+// What this would mean is that each other peer would have certain properties, including
+// (Address, identifier, rumormongeringWith)
+// probably not worth
 type Peerster struct {
-	UIPort     string
-	gossipAddr string
-	knownPeers []string
-	name       string
-	simple     bool
-	want       []messaging.PeerStatus
+	UIPort             string
+	GossipAddress      string
+	KnownPeers         []string
+	Name               string
+	Simple             bool
+	Want               []messaging.PeerStatus
+	MsgSeqNumber       int
+	ReceivedMessages   map[string][]messaging.RumorMessage
+	RumormongeringWith map[string][]bool
 }
 
 func (peerster Peerster) String() string {
 	return fmt.Sprintf(
-		"UIPort: %s, gossipAddr: %s, knownPeers: %s, name: %s, simple: %t", peerster.UIPort, peerster.gossipAddr, peerster.knownPeers, peerster.name, peerster.simple)
+		"UIPort: %s, GossipAddress: %s, KnownPeers: %s, Name: %s, Simple: %t", peerster.UIPort, peerster.GossipAddress, peerster.KnownPeers, peerster.Name, peerster.Simple)
 }
 
 func (peerster Peerster) createConnection(origin Origin) (net.UDPConn, error) {
@@ -41,7 +50,7 @@ func (peerster Peerster) createConnection(origin Origin) (net.UDPConn, error) {
 	case Client:
 		addr = "127.0.0.1:" + peerster.UIPort
 	case Server:
-		addr = peerster.gossipAddr
+		addr = peerster.GossipAddress
 	}
 	udpAddr, err := net.ResolveUDPAddr("udp4", addr)
 	if err != nil {
@@ -67,7 +76,7 @@ func readFromConnection(conn net.UDPConn) ([]byte, *net.UDPAddr, error) {
 func (peerster Peerster) clientReceive(buffer []byte) {
 	fmt.Println("CLIENT MESSAGE " + string(buffer))
 
-	if peerster.simple {
+	if peerster.Simple {
 		packet := messaging.GossipPacket{Simple: peerster.createSimpleMessage(string(buffer))}
 		err := peerster.sendToKnownPeers(packet, []string{})
 		if err != nil {
@@ -75,19 +84,21 @@ func (peerster Peerster) clientReceive(buffer []byte) {
 		}
 	} else {
 		rumor := messaging.RumorMessage{
-			Origin: peerster.name,
+			Origin: peerster.Name,
 			ID:     2,
 			Text:   string(buffer),
 		}
-		peerster.handleIncomingRumor(&rumor)
+		peerster.handleIncomingRumor(&rumor, net.UDPAddr{})
 	}
 }
 
-func (peerster Peerster) handleIncomingRumor(rumor *messaging.RumorMessage) {
+// Handles an incoming rumor message. A zero-value originAddr means the message came from a client.
+func (peerster Peerster) handleIncomingRumor(rumor *messaging.RumorMessage, originAddr net.UDPAddr) {
 	if rumor == nil {
 		return
 	}
 	peerster.addToWantStruct(rumor.Origin, rumor.ID)
+	peerster.addToReceivedMessages(*rumor)
 	isNew := peerster.updateWantStruct(rumor.Origin, rumor.ID)
 	if isNew {
 		err := peerster.sendToRandomPeer(messaging.GossipPacket{Rumor: rumor}, []string{})
@@ -95,20 +106,70 @@ func (peerster Peerster) handleIncomingRumor(rumor *messaging.RumorMessage) {
 			fmt.Printf("Warning: Could not send to random peer. Reason: %s", err)
 		}
 	}
-
+	// TODO Status packet shite?
 }
 
-func (peerster Peerster) handleIncomingStatusPacket(packet *messaging.StatusPacket) {
+// Creates a map origin -> want
+// TODO should be a method
+func createWantMap(want []messaging.PeerStatus) (wantMap map[string]messaging.PeerStatus) {
+	for i := range want {
+		peerWant := want[i]
+		wantMap[peerWant.Identifier] = peerWant
+	}
+	return
+}
+
+// Returns a slice of the missing messages that you have and another peer doesn't
+func (peerster Peerster) getMissingMessages(theirNextId, myNextId uint32, origin string) (messages []messaging.RumorMessage) {
+	for i := theirNextId; theirNextId < myNextId; i++ {
+		messages = append(messages, peerster.ReceivedMessages[origin][i])
+	}
+	return
+}
+
+func (peerster Peerster) handleIncomingStatusPacket(packet *messaging.StatusPacket, originAddr net.UDPAddr) {
 	if packet == nil {
 		return
+	}
+	wantMap := createWantMap(peerster.Want)
+	for i := range packet.Want {
+		otherPeerWant := packet.Want[i]
+		myWant := wantMap[otherPeerWant.Identifier]
+		if myWant == (messaging.PeerStatus{}) {
+			return //this situation means we don't have the peer registered, idk what to do then, add to list of peers?
+		}
+
+		statusPacket := messaging.StatusPacket{Want: peerster.Want}
+		gossipPacket := messaging.GossipPacket{Status: &statusPacket}
+		if myWant.NextID > otherPeerWant.NextID {
+			// He's out of date, we transmit messages hes missing
+			messages := peerster.getMissingMessages(otherPeerWant.NextID, myWant.NextID, otherPeerWant.Identifier)
+			nextMsg := messages[0]
+			// peerster.send(nextMsg, addr)
+			//TODO what do i do with the messages, apparently you send "one" (in bold) message.
+			// but that's weird, no? what about hte rest of the messages
+
+			//TODO open a "session"/"connection" with another peer. You need to track the state here, because
+			// one takes different actions based on whether one is the rumormonger or not
+			// is it enough to just have a boolean "rumormongering-with" flag? problem is that this means you would treat
+			// every statuspacket coming from a specific peer as if he is not rumormongering with you, but is that necessarily
+			// the truth?
+		} else if myWant.NextID == otherPeerWant.NextID {
+			// We are up to date, so we ACK with a statuspacket? not sure
+			/*TODO ok so apparently: sending peer (rumormonger) flips a coin, either picks a random peer to send
+			the rumor message to or does nothing*/
+		} else if myWant.NextID < otherPeerWant.NextID {
+			// I'm out of date, we send him our status packet saying we are OOD, he should send us msgs
+			peerster.sendToPeer(originAddr.String(), gossipPacket, []string{})
+		}
 	}
 }
 
 func (peerster Peerster) chooseRandomPeer() (string, error) {
 	var validPeers []string
-	for i := range peerster.knownPeers {
-		peer := peerster.knownPeers[i]
-		if peer != peerster.gossipAddr {
+	for i := range peerster.KnownPeers {
+		peer := peerster.KnownPeers[i]
+		if peer != peerster.GossipAddress {
 			validPeers = append(validPeers, peer)
 		}
 	}
@@ -134,12 +195,11 @@ func (peerster Peerster) serverReceive(buffer []byte, originAddr net.UDPAddr) {
 	}
 	blacklist := []string{addr} // we won't send a message to these peers
 	peerster.addToKnownPeers(addr)
-	receivedPacket.Simple.RelayPeerAddr = peerster.gossipAddr //TODO this line might not be necessary after part1
-	if !peerster.simple {
-		peerster.handleIncomingRumor(receivedPacket.Rumor)
-		peerster.handleIncomingStatusPacket(receivedPacket.Status)
+	receivedPacket.Simple.RelayPeerAddr = peerster.GossipAddress //TODO this line might not be necessary after part1
+	if !peerster.Simple {
+		peerster.handleIncomingRumor(receivedPacket.Rumor, originAddr)
+		peerster.handleIncomingStatusPacket(receivedPacket.Status, originAddr)
 	} else {
-
 	}
 	err = peerster.sendToKnownPeers(*receivedPacket, blacklist)
 	if err != nil {
@@ -153,7 +213,6 @@ func (peerster Peerster) listen(origin Origin) {
 	if err != nil {
 		log.Fatalf("Error: could not listen. Origin: %s, error: %s", origin, err)
 	}
-
 	for {
 		buffer, originAddr, err := readFromConnection(conn)
 		if err != nil {
@@ -174,20 +233,37 @@ func (peerster *Peerster) registerNewPeer(address, peerIdentifier string, initia
 	peerster.addToWantStruct(peerIdentifier, initialSeqId)
 }
 
-// Adds a new peer (given its unique identifier) to the peerster's want structure.
+// Adds a new message to the list of received messages, if it has not already been received.
+// Returns a boolean signifying whether the rumor was new or not
+func (peerster *Peerster) addToReceivedMessages(rumor messaging.RumorMessage) bool {
+	messagesFromPeer := peerster.ReceivedMessages[rumor.Origin]
+	if messagesFromPeer == nil {
+		peerster.ReceivedMessages[rumor.Origin] = []messaging.RumorMessage{}
+		messagesFromPeer = peerster.ReceivedMessages[rumor.Origin]
+	}
+	message := messagesFromPeer[rumor.ID]
+	if message != (messaging.RumorMessage{}) {
+		// zero value, so this message is not received before
+		messagesFromPeer[rumor.ID] = rumor
+		return true
+	}
+	return false
+}
+
+// Adds a new peer (given its unique identifier) to the peerster's Want structure.
 func (peerster *Peerster) addToWantStruct(peerIdentifier string, initialSeqId uint32) {
-	newWant := append(peerster.want, messaging.PeerStatus{
+	newWant := append(peerster.Want, messaging.PeerStatus{
 		Identifier: peerIdentifier,
 		NextID:     initialSeqId + 1,
 	})
-	peerster.want = newWant
+	peerster.Want = newWant
 }
 
 // Called when a message is received. If the nextId of the specified peer is the same as the receivedSeqID, then nextId will be incremented
 // and true will be returned - otherwise, the nextId will not be changed and false will be returned.
 func (peerster *Peerster) updateWantStruct(peerIdentifier string, receivedSeqId uint32) bool {
-	for i := range peerster.want {
-		peer := peerster.want[i]
+	for i := range peerster.Want {
+		peer := peerster.Want[i]
 		if peer.Identifier != peerIdentifier {
 			continue
 		}
@@ -202,20 +278,20 @@ func (peerster *Peerster) updateWantStruct(peerIdentifier string, receivedSeqId 
 
 // Adds the new address to the list of known peers - if it's already there, nothing happens
 func (peerster *Peerster) addToKnownPeers(address string) {
-	if address == peerster.gossipAddr {
+	if address == peerster.GossipAddress {
 		return
 	}
-	for i := range peerster.knownPeers {
-		if address == peerster.knownPeers[i] {
+	for i := range peerster.KnownPeers {
+		if address == peerster.KnownPeers[i] {
 			return
 		}
 	}
-	peerster.knownPeers = append(peerster.knownPeers, address)
+	peerster.KnownPeers = append(peerster.KnownPeers, address)
 }
 
 func (peerster *Peerster) hasReceivedRumor(origin string, seqId uint32) bool {
-	for i := range peerster.want {
-		peer := peerster.want[i]
+	for i := range peerster.Want {
+		peer := peerster.Want[i]
 		if peer.Identifier == origin {
 			if seqId < peer.NextID {
 				return true
@@ -227,21 +303,21 @@ func (peerster *Peerster) hasReceivedRumor(origin string, seqId uint32) bool {
 	return false
 }
 
-// Creates a new SimpleMessage, automatically filling out the name and relaypeeraddr fields
+// Creates a new SimpleMessage, automatically filling out the Name and relaypeeraddr fields
 func (peerster Peerster) createSimpleMessage(msg string) *messaging.SimpleMessage {
 	return &messaging.SimpleMessage{
-		OriginalName:  peerster.name,
-		RelayPeerAddr: peerster.gossipAddr,
+		OriginalName:  peerster.Name,
+		RelayPeerAddr: peerster.GossipAddress,
 		Contents:      msg,
 	}
 }
 
 // Prints out the list of known peers in a formatted fashion
 func (peerster Peerster) listPeers() {
-	for i := range peerster.knownPeers {
-		peer := peerster.knownPeers[i]
+	for i := range peerster.KnownPeers {
+		peer := peerster.KnownPeers[i]
 		fmt.Print(peer)
-		if i < len(peerster.knownPeers)-1 {
+		if i < len(peerster.KnownPeers)-1 {
 			fmt.Print(",")
 		} else {
 			fmt.Println()
@@ -281,9 +357,9 @@ func (peerster Peerster) sendToRandomPeer(packet messaging.GossipPacket, blackli
 
 // Sends a GossipPacket to all known peers.
 func (peerster Peerster) sendToKnownPeers(packet messaging.GossipPacket, blacklist []string) error {
-	for i := range peerster.knownPeers {
-		peer := peerster.knownPeers[i]
-		if peer == peerster.gossipAddr {
+	for i := range peerster.KnownPeers {
+		peer := peerster.KnownPeers[i]
+		if peer == peerster.GossipAddress {
 			break
 		}
 		err := peerster.sendToPeer(peer, packet, blacklist)
@@ -296,17 +372,17 @@ func (peerster Peerster) sendToKnownPeers(packet messaging.GossipPacket, blackli
 
 func createPeerster() Peerster {
 	UIPort := flag.String("UIPort", "8080", "the port the client uses to communicate with peerster")
-	gossipAddr := flag.String("gossipAddr", "127.0.0.1:5000", "the address of the peerster")
-	name := flag.String("name", "nodeA", "the name of the node")
+	gossipAddr := flag.String("GossipAddress", "127.0.0.1:5000", "the address of the peerster")
+	name := flag.String("Name", "nodeA", "the Name of the node")
 	peers := flag.String("peers", "", "known peers")
-	simple := flag.Bool("simple", true, "simple mode")
+	simple := flag.Bool("Simple", true, "Simple mode")
 	flag.Parse()
 	return Peerster{
-		UIPort:     *UIPort,
-		gossipAddr: *gossipAddr,
-		knownPeers: strings.Split(*peers, ","),
-		name:       *name,
-		simple:     *simple,
+		UIPort:        *UIPort,
+		GossipAddress: *gossipAddr,
+		KnownPeers:    strings.Split(*peers, ","),
+		Name:          *name,
+		Simple:        *simple,
 	}
 }
 
