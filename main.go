@@ -36,7 +36,7 @@ type Peerster struct {
 	Want               []messaging.PeerStatus
 	MsgSeqNumber       uint32
 	ReceivedMessages   map[string][]messaging.RumorMessage
-	RumormongeringWith map[string][]bool //TODO is this necessary?
+	RumormongeringWith map[string]bool //TODO is this necessary?
 }
 
 func (peerster Peerster) String() string {
@@ -102,12 +102,14 @@ func (peerster Peerster) handleIncomingRumor(rumor *messaging.RumorMessage, orig
 	peerster.addToReceivedMessages(*rumor)
 	isNew := peerster.updateWantStruct(rumor.Origin, rumor.ID)
 	if isNew {
-		err := peerster.sendToRandomPeer(messaging.GossipPacket{Rumor: rumor}, []string{})
+		peer, err := peerster.sendToRandomPeer(messaging.GossipPacket{Rumor: rumor}, []string{})
 		if err != nil {
 			fmt.Printf("Warning: Could not send to random peer. Reason: %s", err)
 		}
+		if originAddr.String() == peerster.GossipAddress { // We sent the message, so we say we are now rumormongering with this guy
+			peerster.RumormongeringWith[peer] = true
+		}
 	}
-	// TODO Status packet shite?
 }
 
 // Creates a map origin -> want
@@ -115,7 +117,7 @@ func (peerster Peerster) handleIncomingRumor(rumor *messaging.RumorMessage, orig
 func createWantMap(want []messaging.PeerStatus) (wantMap map[string]messaging.PeerStatus) {
 	for i := range want {
 		peerWant := want[i]
-		wantMap[peerWant.Identifier] = peerWant
+		wantMap[peerWant.Identifier] = peerWant //TODO solve possible panic
 	}
 	return
 }
@@ -137,23 +139,22 @@ func (peerster Peerster) handleIncomingStatusPacket(packet *messaging.StatusPack
 		otherPeerWant := packet.Want[i]
 		myWant := wantMap[otherPeerWant.Identifier]
 		if myWant == (messaging.PeerStatus{}) {
-			return //this situation means we don't have the peer registered, idk what to do then, add to list of peers?
+			return //TODO this situation means we don't have the peer registered, idk what to do then, add to list of peers?
 		}
 
 		statusPacket := messaging.StatusPacket{Want: peerster.Want}
 		gossipPacket := messaging.GossipPacket{Status: &statusPacket}
-		synced := true
+		synced := false
 		if myWant.NextID > otherPeerWant.NextID {
 			// He's out of date, we transmit messages hes missing (for this particular peer)
 			messages := peerster.getMissingMessages(otherPeerWant.NextID, myWant.NextID, otherPeerWant.Identifier)
 			nextMsg := messages[0]
-			err := peerster.sendToPeer("", messaging.GossipPacket{
+			err := peerster.sendToPeer(originAddr.String(), messaging.GossipPacket{
 				Rumor: &nextMsg,
 			}, []string{})
 			if err != nil {
 				fmt.Printf("Could not send missing rumor to peer, reason: %s", err)
 			}
-			synced = false
 			break
 			//TODO what do i do with the messages, apparently you send "one" (in bold) message.
 			// but that's weird, no? what about hte rest of the messages
@@ -169,14 +170,26 @@ func (peerster Peerster) handleIncomingStatusPacket(packet *messaging.StatusPack
 			if err != nil {
 				fmt.Printf("Could not send statuspacket. Reason: %s", err)
 			}
-			synced = false
+		} else {
+			synced = true
 		}
 
 		if synced {
 			fmt.Printf("SYCNED. Flipping coin.")
-			//TODO coinflip
+			if peerster.considerRumormongering() {
+				//TODO keep rumormongering, whatever that means
+				// also, you should only do this coinflip if you are the SENDER, the initiator.
+				// this must be checked through using the boolean thing in the struct, right?
+				// you also need to rumormonger the original message in that case, which needs to be stored..
+			}
 		}
 	}
+}
+
+func (peerster Peerster) considerRumormongering() bool {
+	rnd := rand.Rand{}
+	num := rnd.Intn(2)
+	return num > 1
 }
 
 func (peerster Peerster) chooseRandomPeer() (string, error) {
@@ -359,13 +372,13 @@ func (peerster Peerster) sendToPeer(peer string, packet messaging.GossipPacket, 
 	return nil
 }
 
-func (peerster Peerster) sendToRandomPeer(packet messaging.GossipPacket, blacklist []string) error {
+func (peerster Peerster) sendToRandomPeer(packet messaging.GossipPacket, blacklist []string) (string, error) {
 	peer, err := peerster.chooseRandomPeer()
 	if err != nil {
 		fmt.Printf("Could not choose random peer, reason: %s", err)
-		return err
+		return "", err
 	}
-	return peerster.sendToPeer(peer, packet, blacklist)
+	return peer, peerster.sendToPeer(peer, packet, blacklist)
 }
 
 // Sends a GossipPacket to all known peers.
@@ -396,7 +409,7 @@ func createPeerster() Peerster {
 		KnownPeers:         strings.Split(*peers, ","),
 		Name:               *name,
 		Simple:             *simple,
-		RumormongeringWith: map[string][]bool{},
+		RumormongeringWith: map[string]bool{},
 		ReceivedMessages:   map[string][]messaging.RumorMessage{},
 		MsgSeqNumber:       1,
 		Want:               []messaging.PeerStatus{},
