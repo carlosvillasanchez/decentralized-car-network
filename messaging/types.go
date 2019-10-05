@@ -26,3 +26,10 @@ type PeerStatus struct {
 type StatusPacket struct {
 	Want []PeerStatus
 }
+
+type RumormongeringSession struct {
+	PeerIdentifier string
+	Message        string
+	TimeLeft       int
+	Active         bool
+}
