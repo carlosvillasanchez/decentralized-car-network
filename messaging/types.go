@@ -28,8 +28,7 @@ type StatusPacket struct {
 }
 
 type RumormongeringSession struct {
-	PeerIdentifier string
-	Message        string
-	TimeLeft       int
-	Active         bool
+	Message  string
+	TimeLeft int
+	Active   bool
 }

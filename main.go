@@ -28,15 +28,35 @@ const (
 // (Address, identifier, rumormongeringWith)
 // probably not worth
 type Peerster struct {
-	UIPort             string
-	GossipAddress      string
-	KnownPeers         []string
-	Name               string
-	Simple             bool
-	Want               []messaging.PeerStatus
-	MsgSeqNumber       uint32
-	ReceivedMessages   map[string][]messaging.RumorMessage
-	RumormongeringWith map[string]bool //TODO is this necessary?
+	UIPort                 string
+	GossipAddress          string
+	KnownPeers             []string
+	Name                   string
+	Simple                 bool
+	Want                   []messaging.PeerStatus
+	MsgSeqNumber           uint32
+	ReceivedMessages       map[string][]messaging.RumorMessage
+	RumormongeringSessions map[string]messaging.RumormongeringSession //TODO is this necessary?
+}
+
+func stringAddrToUDPAddr(addr string) net.UDPAddr {
+	ipAndPort := strings.Split(addr, ":")
+	port, err := strconv.Atoi(ipAndPort[1])
+	fmt.Println(string([]byte(ipAndPort[0])))
+	thing := net.UDPAddr{
+		IP:   []byte(ipAndPort[0]),
+		Port: port,
+		Zone: "",
+	}
+	fmt.Println(thing.IP, thing, "???")
+	if err != nil {
+		return net.UDPAddr{}
+	}
+	return net.UDPAddr{
+		IP:   []byte(ipAndPort[0]),
+		Port: port,
+		Zone: "",
+	}
 }
 
 func (peerster Peerster) String() string {
@@ -89,8 +109,27 @@ func (peerster Peerster) clientReceive(buffer []byte) {
 			Text:   string(buffer),
 		}
 		peerster.MsgSeqNumber = peerster.MsgSeqNumber + 1
-		peerster.handleIncomingRumor(&rumor, net.UDPAddr{})
+		peerster.handleIncomingRumor(&rumor, stringAddrToUDPAddr(peerster.GossipAddress))
 	}
+}
+
+func (peerster *Peerster) startRumormongeringSession(peer, message string) error {
+	session := peerster.RumormongeringSessions[peer]
+	if !session.Active {
+		session.Active = true
+		session.TimeLeft = 10
+		session.Message = message
+		go func() {
+			for session.TimeLeft > 0 {
+				session.TimeLeft = session.TimeLeft - 1
+				time.Sleep(1000 * time.Millisecond)
+			}
+			session.Active = false
+		}()
+	} else {
+		return fmt.Errorf("attempted to start a rumormongering session with %q, but one was already active", peer)
+	}
+	return nil
 }
 
 // Handles an incoming rumor message. A zero-value originAddr means the message came from a client.
@@ -101,13 +140,18 @@ func (peerster Peerster) handleIncomingRumor(rumor *messaging.RumorMessage, orig
 	peerster.addToWantStruct(rumor.Origin, rumor.ID)
 	peerster.addToReceivedMessages(*rumor)
 	isNew := peerster.updateWantStruct(rumor.Origin, rumor.ID)
-	if isNew {
+	isFromMyself := originAddr.String() == peerster.GossipAddress
+	fmt.Println(isFromMyself, isNew, rumor.Text, rumor.ID, rumor.Origin, peerster.GossipAddress, originAddr.String(), originAddr.IP, originAddr.IP.String())
+	if isNew || isFromMyself {
 		peer, err := peerster.sendToRandomPeer(messaging.GossipPacket{Rumor: rumor}, []string{})
 		if err != nil {
 			fmt.Printf("Warning: Could not send to random peer. Reason: %s", err)
 		}
-		if originAddr.String() == peerster.GossipAddress { // We sent the message, so we say we are now rumormongering with this guy
-			peerster.RumormongeringWith[peer] = true
+		if isFromMyself { // We sent the message, so we say we are now rumormongering with this guy
+			err := peerster.startRumormongeringSession(peer, rumor.Text)
+			if err != nil {
+				fmt.Printf("Was not able to start rumormongering session, reason: %s", err)
+			}
 		}
 	}
 }
@@ -115,9 +159,10 @@ func (peerster Peerster) handleIncomingRumor(rumor *messaging.RumorMessage, orig
 // Creates a map origin -> want
 // TODO should be a method
 func createWantMap(want []messaging.PeerStatus) (wantMap map[string]messaging.PeerStatus) {
+	wantMap = map[string]messaging.PeerStatus{}
 	for i := range want {
 		peerWant := want[i]
-		wantMap[peerWant.Identifier] = peerWant //TODO solve possible panic
+		wantMap[peerWant.Identifier] = peerWant
 	}
 	return
 }
@@ -276,10 +321,10 @@ func (peerster *Peerster) addToReceivedMessages(rumor messaging.RumorMessage) bo
 }
 
 // Adds a new peer (given its unique identifier) to the peerster's Want structure.
-func (peerster *Peerster) addToWantStruct(peerIdentifier string, initialSeqId uint32) {
+func (peerster *Peerster) addToWantStruct(peerIdentifier string, initialSeqId uint32) { //TODO remove initialseqid
 	newWant := append(peerster.Want, messaging.PeerStatus{
 		Identifier: peerIdentifier,
-		NextID:     initialSeqId + 1,
+		NextID:     0,
 	})
 	peerster.Want = newWant
 }
@@ -404,21 +449,23 @@ func createPeerster() Peerster {
 	simple := flag.Bool("simple", false, "Simple mode")
 	flag.Parse()
 	return Peerster{
-		UIPort:             *UIPort,
-		GossipAddress:      *gossipAddr,
-		KnownPeers:         strings.Split(*peers, ","),
-		Name:               *name,
-		Simple:             *simple,
-		RumormongeringWith: map[string]bool{},
-		ReceivedMessages:   map[string][]messaging.RumorMessage{},
-		MsgSeqNumber:       1,
-		Want:               []messaging.PeerStatus{},
+		UIPort:                 *UIPort,
+		GossipAddress:          *gossipAddr,
+		KnownPeers:             strings.Split(*peers, ","),
+		Name:                   *name,
+		Simple:                 *simple,
+		RumormongeringSessions: map[string]messaging.RumormongeringSession{},
+		ReceivedMessages:       map[string][]messaging.RumorMessage{},
+		MsgSeqNumber:           1,
+		Want:                   []messaging.PeerStatus{},
 	}
 }
 
 func main() {
 	peerster := createPeerster()
-	//fmt.Println(peerster.String())
+	fmt.Println(peerster.String())
+	addr := stringAddrToUDPAddr(peerster.GossipAddress)
+	fmt.Println(addr.String(), addr.IP.String(), peerster.GossipAddress)
 	go peerster.listen(Server)
 	peerster.listen(Client)
 }
