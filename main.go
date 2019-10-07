@@ -37,6 +37,7 @@ type Peerster struct {
 	MsgSeqNumber           uint32
 	ReceivedMessages       map[string][]messaging.RumorMessage
 	RumormongeringSessions map[string]messaging.RumormongeringSession //TODO is this necessary?
+	Conn net.UDPConn
 }
 
 func stringAddrToUDPAddr(addr string) net.UDPAddr {
@@ -88,6 +89,7 @@ func (peerster *Peerster) createConnection(origin Origin) (net.UDPConn, error) {
 func readFromConnection(conn net.UDPConn) ([]byte, *net.UDPAddr, error) {
 	buffer := make([]byte, 1024)
 	n, originAddr, err := conn.ReadFromUDP(buffer)
+	fmt.Println("AMOUNT READ: ", n)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -142,9 +144,7 @@ func (peerster *Peerster) handleIncomingRumor(rumor *messaging.RumorMessage, ori
 	peerster.addToWantStruct(rumor.Origin, rumor.ID)
 	peerster.addToReceivedMessages(*rumor)
 	isNew := peerster.updateWantStruct(rumor.Origin, rumor.ID)
-	fmt.Println(peerster.Want, "THIS")
 	isFromMyself := string(originAddr.IP)+":"+strconv.Itoa(originAddr.Port) == peerster.GossipAddress
-	fmt.Println(isFromMyself, isNew, rumor.Text, rumor.ID, rumor.Origin, peerster.GossipAddress, originAddr.String(), &originAddr.IP, originAddr.IP.String())
 	if isNew || isFromMyself {
 		peer, err := peerster.sendToRandomPeer(messaging.GossipPacket{Rumor: rumor}, []string{})
 		if err != nil {
@@ -266,20 +266,21 @@ func (peerster *Peerster) chooseRandomPeer() (string, error) {
 func (peerster *Peerster) serverReceive(buffer []byte, originAddr net.UDPAddr) {
 	receivedPacket := &messaging.GossipPacket{}
 	err := protobuf.Decode(buffer, receivedPacket)
+	fmt.Println(receivedPacket.Simple, "ALRIGHT BOYS")
 	if err != nil {
 		fmt.Printf("Error: could not decode packet, reason: %s", err)
 	}
 	addr := originAddr.IP.String() + ":" + strconv.Itoa(originAddr.Port)
-
+	if receivedPacket.Simple != nil && receivedPacket.Simple.RelayPeerAddr != "" {
+		addr = receivedPacket.Simple.RelayPeerAddr
+	}
 	peerster.addToKnownPeers(addr)
 	if !peerster.Simple {
 		peerster.handleIncomingRumor(receivedPacket.Rumor, originAddr)
 		peerster.handleIncomingStatusPacket(receivedPacket.Status, originAddr)
 	} else {
 		//TODO Handle SimpleMessage and Rumor cases differently. If it's a simplemessage, the relay origin addr is probably inside the message
-		if receivedPacket.Simple.RelayPeerAddr != "" {
-			addr = receivedPacket.Simple.RelayPeerAddr
-		}
+
 		fmt.Printf("SIMPLE MESSAGE origin %s from %s contents %s \n", receivedPacket.Simple.OriginalName, receivedPacket.Simple.RelayPeerAddr, receivedPacket.Simple.Contents)
 		blacklist := []string{addr}                                  // we won't send a message to these peers
 		receivedPacket.Simple.RelayPeerAddr = peerster.GossipAddress //TODO this line might not be necessary after part1
@@ -296,8 +297,9 @@ func (peerster *Peerster) listen(origin Origin) {
 	if err != nil {
 		log.Fatalf("Error: could not listen. Origin: %s, error: %s", origin, err)
 	}
+	peerster.Conn = conn
 	for {
-		buffer, originAddr, err := readFromConnection(conn)
+		buffer, originAddr, err := readFromConnection(peerster.Conn)
 		if err != nil {
 			log.Printf("Could not read from connection, origin: %s, reason: %s", origin, err)
 			break
@@ -347,16 +349,13 @@ func (peerster *Peerster) addToWantStruct(peerIdentifier string, initialSeqId ui
 // Called when a message is received. If the nextId of the specified peer is the same as the receivedSeqID, then nextId will be incremented
 // and true will be returned - otherwise, the nextId will not be changed and false will be returned.
 func (peerster *Peerster) updateWantStruct(peerIdentifier string, receivedSeqId uint32) bool {
-	fmt.Println(peerster.Want)
 	for i := range peerster.Want {
 		peer := peerster.Want[i]
-		fmt.Println(peer.Identifier, peer.NextID, peerIdentifier, receivedSeqId)
 		if peer.Identifier != peerIdentifier {
 			continue
 		}
 		if peer.NextID == receivedSeqId {
 			peerster.Want[i].NextID += 1
-			fmt.Println(peerster.Want[i], peer, "?????")
 			return true
 		}
 		break
@@ -404,14 +403,13 @@ func (peerster *Peerster) createSimpleMessage(msg string) *messaging.SimpleMessa
 func (peerster *Peerster) listPeers() {
 	for i := range peerster.KnownPeers {
 		peer := peerster.KnownPeers[i]
-		fmt.Print(peer)
+		fmt.Print(peer, "WHAT")
 		if i < len(peerster.KnownPeers)-1 {
 			fmt.Print(",")
 		} else {
 			fmt.Println()
 		}
 	}
-
 }
 
 func (peerster Peerster) sendToPeer(peer string, packet messaging.GossipPacket, blacklist []string) error {
@@ -420,17 +418,12 @@ func (peerster Peerster) sendToPeer(peer string, packet messaging.GossipPacket, 
 			return fmt.Errorf("peer %q is blacklisted")
 		}
 	}
-	gossipAddr := stringAddrToUDPAddr(peerster.GossipAddress)
 	peerAddr := stringAddrToUDPAddr(peer)
-	conn, err := net.DialUDP("udp4", &gossipAddr, &peerAddr)
-	if err != nil {
-		return err
-	}
 	packetBytes, err := protobuf.Encode(&packet)
 	if err != nil {
 		return err
 	}
-	_, err = conn.Write(packetBytes)
+	_, err = peerster.Conn.WriteToUDP(packetBytes, &peerAddr)
 	if err != nil {
 		return err
 	}
@@ -478,6 +471,7 @@ func createPeerster() Peerster {
 		ReceivedMessages:       map[string][]messaging.RumorMessage{},
 		MsgSeqNumber:           1,
 		Want:                   []messaging.PeerStatus{},
+		Conn: net.UDPConn{},
 	}
 }
 
