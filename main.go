@@ -118,20 +118,27 @@ func (peerster *Peerster) clientReceive(buffer []byte) {
 	}
 }
 
-func (peerster *Peerster) startRumormongeringSession(peer, message string) error {
+func (peerster *Peerster) startRumormongeringSession(peer string, message messaging.RumorMessage) error {
 	session := peerster.RumormongeringSessions[peer]
+	fmt.Printf("Starting sessoin, active: %b, timeleft: %v, message: %s, peer: %s, \n", session.Active, session.TimeLeft, message, peer)
 	if !session.Active {
 		session.Active = true
-		session.TimeLeft = 10
+		session.ResetTimer()
 		session.Message = message
+		peerster.RumormongeringSessions[peer] = session
+		fmt.Printf("printing session, %s \n", session)
 		go func() {
-			for session.TimeLeft > 0 {
-				session.TimeLeft = session.TimeLeft - 1
+			for peerster.RumormongeringSessions[peer].TimeLeft > 0 {
+				session = peerster.RumormongeringSessions[peer]
+				session.DecrementTimer()
+				peerster.RumormongeringSessions[peer] = session
 				time.Sleep(1000 * time.Millisecond)
 			}
+			fmt.Printf("SESSION TIMEOUT, PEER: %s \n", peer)
 			session.Active = false
 		}()
 	} else {
+		session.ResetTimer()
 		return fmt.Errorf("attempted to start a rumormongering session with %q, but one was already active", peer)
 	}
 	return nil
@@ -145,14 +152,14 @@ func (peerster *Peerster) handleIncomingRumor(rumor *messaging.RumorMessage, ori
 	peerster.addToWantStruct(rumor.Origin, rumor.ID)
 	peerster.addToReceivedMessages(*rumor)
 	isNew := peerster.updateWantStruct(rumor.Origin, rumor.ID)
-	isFromMyself := string(originAddr.IP)+":"+strconv.Itoa(originAddr.Port) == peerster.GossipAddress
+	isFromMyself := originAddr.String() == peerster.GossipAddress
 	if isNew || isFromMyself {
 		peer, err := peerster.sendToRandomPeer(messaging.GossipPacket{Rumor: rumor}, []string{})
 		if err != nil {
 			fmt.Printf("Warning: Could not send to random peer. Reason: %s", err)
 		}
 		if isFromMyself { // We sent the message, so we say we are now rumormongering with this guy
-			err := peerster.startRumormongeringSession(peer, rumor.Text)
+			err := peerster.startRumormongeringSession(peer, *rumor)
 			if err != nil {
 				fmt.Printf("Was not able to start rumormongering session, reason: %s", err)
 			}
@@ -207,7 +214,6 @@ func (peerster *Peerster) handleIncomingStatusPacket(packet *messaging.StatusPac
 		if myWant == (messaging.PeerStatus{}) {
 			return //TODO this situation means we don't have the peer registered, idk what to do then, add to list of peers?
 		}
-
 		statusPacket := messaging.StatusPacket{Want: peerster.Want}
 		gossipPacket := messaging.GossipPacket{Status: &statusPacket}
 		synced := false
@@ -222,14 +228,6 @@ func (peerster *Peerster) handleIncomingStatusPacket(packet *messaging.StatusPac
 				fmt.Printf("Could not send missing rumor to peer, reason: %s", err)
 			}
 			break
-			//TODO what do i do with the messages, apparently you send "one" (in bold) message.
-			// but that's weird, no? what about hte rest of the messages
-
-			//TODO open a "session"/"connection" with another peer. You need to track the state here, because
-			// one takes different actions based on whether one is the rumormonger or not
-			// is it enough to just have a boolean "rumormongering-with" flag? problem is that this means you would treat
-			// every statuspacket coming from a specific peer as if he is not rumormongering with you, but is that necessarily
-			// the truth?
 		} else if myWant.NextID < otherPeerWant.NextID {
 			// I'm out of date, we send him our status packet saying we are OOD, he should send us msgs
 			err := peerster.sendToPeer(originAddr.String(), gossipPacket, []string{})
@@ -239,23 +237,22 @@ func (peerster *Peerster) handleIncomingStatusPacket(packet *messaging.StatusPac
 		} else {
 			synced = true
 		}
-
 		if synced {
 			fmt.Printf("SYCNED. Flipping coin.")
-			//			if peerster.considerRumormongering() {
-			//TODO keep rumormongering, whatever that means
-			// also, you should only do this coinflip if you are the SENDER, the initiator.
-			// this must be checked through using the boolean thing in the struct, right?
-			// you also need to rumormonger the original message in that case, which needs to be stored..
-			//	}
+			session := peerster.RumormongeringSessions[originAddr.String()]
+			if session.Active && peerster.considerRumormongering() {
+				fmt.Println("We rumormongering now. Session details: ")
+				fmt.Printf("Active: %b, Originalmessage: %q, TimeLeft: %v", session.Active, session.Message, session.TimeLeft)
+				peerster.handleIncomingRumor(&session.Message, stringAddrToUDPAddr(peerster.GossipAddress))
+			}
 		}
 	}
 }
 
 func (peerster *Peerster) considerRumormongering() bool {
-	rnd := rand.Rand{}
-	num := rnd.Intn(2)
-	return num > 1
+	num := rand.Intn(2)
+	fmt.Printf("RANDOM NUMBER: %v", num)
+	return num > 0
 }
 
 func (peerster *Peerster) chooseRandomPeer() (string, error) {
@@ -266,12 +263,10 @@ func (peerster *Peerster) chooseRandomPeer() (string, error) {
 			validPeers = append(validPeers, peer)
 		}
 	}
-	s := rand.NewSource(time.Now().Unix())
-	r := rand.New(s)
 	if validPeers == nil {
 		return "", errors.New("slice of valid peers is empty/nil")
 	}
-	return validPeers[r.Intn(len(validPeers))], nil
+	return validPeers[rand.Intn(len(validPeers))], nil
 }
 
 func (peerster *Peerster) serverReceive(buffer []byte, originAddr net.UDPAddr) {
@@ -491,6 +486,7 @@ func createPeerster() Peerster {
 }
 
 func main() {
+	rand.Seed(time.Now().UnixNano())
 	peerster := createPeerster()
 	fmt.Println(peerster.String())
 	addr := stringAddrToUDPAddr(peerster.GossipAddress)

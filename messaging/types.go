@@ -28,7 +28,15 @@ type StatusPacket struct {
 }
 
 type RumormongeringSession struct {
-	Message  string
+	Message  RumorMessage
 	TimeLeft int
 	Active   bool
+}
+
+func (r *RumormongeringSession) DecrementTimer() {
+	r.TimeLeft--
+}
+
+func (r *RumormongeringSession) ResetTimer() {
+	r.TimeLeft = 10
 }
