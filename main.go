@@ -94,7 +94,7 @@ func readFromConnection(conn net.UDPConn) ([]byte, *net.UDPAddr, error) {
 }
 
 func (peerster *Peerster) clientReceive(buffer []byte) {
-	fmt.Println("CLIENT MESSAGE " + string(buffer))
+	fmt.Println("CLIENT MESSAGE " + string(buffer)) //TODO use Message struct
 
 	if peerster.Simple {
 		packet := messaging.GossipPacket{Simple: peerster.createSimpleMessage(string(buffer))}
@@ -148,14 +148,16 @@ func (peerster *Peerster) startRumormongeringSession(peer string, message messag
 }
 
 // Handles an incoming rumor message. A zero-value originAddr means the message came from a client.
-func (peerster *Peerster) handleIncomingRumor(rumor *messaging.RumorMessage, originAddr net.UDPAddr) {
+func (peerster *Peerster) handleIncomingRumor(rumor *messaging.RumorMessage, originAddr net.UDPAddr) string {
 	if rumor == nil {
-		return
+		return ""
 	}
+	fmt.Printf("RUMOR origin %s from %s ID %v contents %s \n", rumor.Origin, originAddr.IP.String(), rumor.ID, rumor.Text)
 	peerster.addToWantStruct(rumor.Origin, rumor.ID)
 	peerster.addToReceivedMessages(*rumor)
 	isNew := peerster.updateWantStruct(rumor.Origin, rumor.ID)
 	isFromMyself := originAddr.String() == peerster.GossipAddress
+	var peer string
 	if isNew || isFromMyself {
 		peer, err := peerster.sendToRandomPeer(messaging.GossipPacket{Rumor: rumor}, []string{})
 		if err != nil {
@@ -175,6 +177,7 @@ func (peerster *Peerster) handleIncomingRumor(rumor *messaging.RumorMessage, ori
 			fmt.Printf("Could not send status packet to %s, reason: %s \n", originAddr.String(), err)
 		}
 	}
+	return peer
 }
 
 // Creates a map origin -> want
@@ -195,6 +198,8 @@ func (peerster *Peerster) getMissingMessages(theirNextId, myNextId uint32, origi
 		fmt.Println("i: ", i)
 		messages = append(messages, peerster.ReceivedMessages[origin][i])
 	}
+	for i := range peerster.Want {
+	}
 	return
 }
 
@@ -210,9 +215,41 @@ func (peerster *Peerster) handleIncomingStatusPacket(packet *messaging.StatusPac
 	if packet == nil {
 		return
 	}
+	// Printing for the automated tests
+	fmt.Printf("STATUS from %s ", originAddr.String())
+	for i := range packet.Want {
+		fmt.Printf("peer %s nextID %v ", packet.Want[i].Identifier, packet.Want[i].NextID)
+	}
+	fmt.Println()
+	// End printing
 	session := peerster.RumormongeringSessions[originAddr.String()]
 	session.ResetTimer() //TODO is this the appropriate place to reset the timer?
 	wantMap := createWantMap(peerster.Want)
+
+	//Handles the case where the other peer doesn't even know about a certain peer we know about
+	for i := range peerster.Want {
+		identifier := peerster.Want[i].Identifier
+		found := false
+		for j := range packet.Want {
+			if packet.Want[j].Identifier == identifier {
+				found = true
+				break
+			}
+		}
+		if !found {
+			// Other peer doesn't even know about one of the peers in our want, so we just send him this peer's first message here
+			fmt.Printf("Other peer doesn't know about a peer. Sending first message.")
+			firstMessage := peerster.ReceivedMessages[packet.Want[i].Identifier][0]
+			err := peerster.sendToPeer(originAddr.String(), messaging.GossipPacket{
+				Rumor: &firstMessage,
+			}, []string{})
+			if err != nil {
+				fmt.Printf("Could not send first message to another peer, reason: %s \n", err)
+			}
+			return
+		}
+	}
+
 	for i := range packet.Want {
 		otherPeerWant := packet.Want[i]
 		myWant := wantMap[otherPeerWant.Identifier]
@@ -245,10 +282,13 @@ func (peerster *Peerster) handleIncomingStatusPacket(packet *messaging.StatusPac
 		if synced {
 			session := peerster.RumormongeringSessions[originAddr.String()].Pointer()
 			peerster.printMessages()
+			fmt.Printf("IN SYNC WITH %s \n", originAddr.String())
 			if session.Active && peerster.considerRumormongering() {
+
 				fmt.Println("We rumormongering now. Session details: ")
 				fmt.Printf("Active: %b, Originalmessage: %q, TimeLeft: %v \n", session.Active, session.Message, session.TimeLeft)
-				peerster.handleIncomingRumor(&session.Message, stringAddrToUDPAddr(peerster.GossipAddress))
+				targetAddr := peerster.handleIncomingRumor(&session.Message, stringAddrToUDPAddr(peerster.GossipAddress))
+				fmt.Printf("FLIPPED COIN sending rumor to %s \n", targetAddr)
 			}
 			session.Active = false
 		}
@@ -449,6 +489,10 @@ func (peerster Peerster) sendToPeer(peer string, packet messaging.GossipPacket, 
 		if peer == blacklist[j] {
 			return fmt.Errorf("peer %q is blacklisted")
 		}
+	}
+
+	if packet.Rumor != nil {
+		fmt.Printf("MONGERING with %s \n", peer)
 	}
 	peerAddr := stringAddrToUDPAddr(peer)
 	packetBytes, err := protobuf.Encode(&packet)
