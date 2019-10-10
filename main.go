@@ -198,8 +198,6 @@ func (peerster *Peerster) getMissingMessages(theirNextId, myNextId uint32, origi
 		fmt.Println("i: ", i)
 		messages = append(messages, peerster.ReceivedMessages[origin][i])
 	}
-	for i := range peerster.Want {
-	}
 	return
 }
 
