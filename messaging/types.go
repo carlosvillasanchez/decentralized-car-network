@@ -1,5 +1,7 @@
 package messaging
 
+import "sync"
+
 type SimpleMessage struct {
 	OriginalName  string
 	RelayPeerAddr string
@@ -31,6 +33,7 @@ type RumormongeringSession struct {
 	Message  RumorMessage
 	TimeLeft int
 	Active   bool
+	Mutex    sync.Mutex
 }
 
 func (r *RumormongeringSession) DecrementTimer() {
@@ -39,4 +42,12 @@ func (r *RumormongeringSession) DecrementTimer() {
 
 func (r *RumormongeringSession) ResetTimer() {
 	r.TimeLeft = 10
+}
+
+func (r *RumormongeringSession) SetActive(value bool) {
+	r.Active = value
+}
+
+func (r RumormongeringSession) Pointer() *RumormongeringSession {
+	return &r
 }
