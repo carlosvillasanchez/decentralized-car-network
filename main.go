@@ -28,6 +28,7 @@ type Peerster struct {
 	KnownPeers             []string
 	Name                   string
 	Simple                 bool
+	AntiEntropyTimer       int
 	Want                   []messaging.PeerStatus
 	MsgSeqNumber           uint32
 	ReceivedMessages       map[string][]messaging.RumorMessage
@@ -152,7 +153,7 @@ func (peerster *Peerster) handleIncomingRumor(rumor *messaging.RumorMessage, ori
 	if rumor == nil {
 		return ""
 	}
-	fmt.Printf("RUMOR origin %s from %s ID %v contents %s \n", rumor.Origin, originAddr.IP.String(), rumor.ID, rumor.Text)
+	fmt.Printf("RUMOR origin %s from %s ID %v contents %s \n", rumor.Origin, originAddr.String(), rumor.ID, rumor.Text)
 	peerster.addToWantStruct(rumor.Origin, rumor.ID)
 	peerster.addToReceivedMessages(*rumor)
 	isNew := peerster.updateWantStruct(rumor.Origin, rumor.ID)
@@ -236,15 +237,18 @@ func (peerster *Peerster) handleIncomingStatusPacket(packet *messaging.StatusPac
 		}
 		if !found {
 			// Other peer doesn't even know about one of the peers in our want, so we just send him this peer's first message here
-			fmt.Printf("Other peer doesn't know about a peer. Sending first message.")
-			firstMessage := peerster.ReceivedMessages[packet.Want[i].Identifier][0]
-			err := peerster.sendToPeer(originAddr.String(), messaging.GossipPacket{
-				Rumor: &firstMessage,
-			}, []string{})
-			if err != nil {
-				fmt.Printf("Could not send first message to another peer, reason: %s \n", err)
+			fmt.Printf("Other peer doesn't know about a peer. Sending first message. \n")
+			fmt.Println("WHAT THE HELL", packet.Want, len(packet.Want), i, peerster.ReceivedMessages, len(peerster.ReceivedMessages))
+			if len(peerster.ReceivedMessages[identifier]) >= 1 {
+				firstMessage := peerster.ReceivedMessages[identifier][0]
+				err := peerster.sendToPeer(originAddr.String(), messaging.GossipPacket{
+					Rumor: &firstMessage,
+				}, []string{})
+				if err != nil {
+					fmt.Printf("Could not send first message to another peer, reason: %s \n", err)
+				}
+				return
 			}
-			return
 		}
 	}
 
@@ -529,12 +533,26 @@ func (peerster *Peerster) sendToKnownPeers(packet messaging.GossipPacket, blackl
 	return nil
 }
 
+func (peerster *Peerster) antiEntropy() {
+	go func() {
+		for {
+			time.Sleep(time.Duration(peerster.AntiEntropyTimer) * time.Second)
+			packet := messaging.GossipPacket{Status: &messaging.StatusPacket{Want: peerster.Want}}
+			_, err := peerster.sendToRandomPeer(packet, []string{})
+			if err != nil {
+				fmt.Printf("Antientropy failed, reason: %s \n", err)
+			}
+		}
+	}()
+}
+
 func createPeerster() Peerster {
 	UIPort := flag.String("UIPort", "8080", "the port the client uses to communicate with peerster")
 	gossipAddr := flag.String("gossipAddr", "127.0.0.1:5000", "the address of the peerster")
 	name := flag.String("name", "nodeA", "the Name of the node")
 	peers := flag.String("peers", "", "known peers")
 	simple := flag.Bool("simple", false, "Simple mode")
+	antiEntropy := flag.Int("antiEntropy", 10, "Anti entropy timer")
 	flag.Parse()
 	return Peerster{
 		UIPort:                 *UIPort,
@@ -542,6 +560,7 @@ func createPeerster() Peerster {
 		KnownPeers:             strings.Split(*peers, ","),
 		Name:                   *name,
 		Simple:                 *simple,
+		AntiEntropyTimer:       *antiEntropy,
 		RumormongeringSessions: map[string]messaging.RumormongeringSession{},
 		ReceivedMessages:       map[string][]messaging.RumorMessage{},
 		MsgSeqNumber:           1,
@@ -557,5 +576,6 @@ func main() {
 	addr := stringAddrToUDPAddr(peerster.GossipAddress)
 	fmt.Println(addr.String(), string(addr.IP), peerster.GossipAddress)
 	go peerster.listen(Server)
+	peerster.antiEntropy()
 	peerster.listen(Client)
 }
