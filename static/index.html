@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+    <link rel = "stylesheet"
+          type = "text/css"
+          href = "main.css" />
+    <script src="main.js"></script>
+</head>
+<body>
+<div class = "main">
+    <h3>Peerster</h3>
+    <div class = "chat">
+        <ul id="chat-list">
+        </ul>
+    </div>
+    <form>
+        <input id="message-input" type="text" placeholder="Message"/>
+        <input type="button" value="Send Message" onclick="sendMessage()"/>
+        <br/>
+        <input id="node-input" type="text" placeholder="Node address"/>
+        <input type="button" value="Add node" onclick="registerNode()">
+    </form>
+</div>
+</body>
+</html>

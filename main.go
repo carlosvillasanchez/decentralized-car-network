@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 	"log"
 	"math/rand"
 	"net"
+	"net/http"
 	"strconv"
 	"strings"
 	"sync"
@@ -38,6 +40,10 @@ type Peerster struct {
 
 func stringAddrToUDPAddr(addr string) net.UDPAddr {
 	ipAndPort := strings.Split(addr, ":")
+	if len(ipAndPort) < 2 {
+		fmt.Printf("Warning: the address %q has the wrong format \n", addr)
+		return net.UDPAddr{}
+	}
 	port, err := strconv.Atoi(ipAndPort[1])
 	ip := strings.Split(ipAndPort[0], ".")
 	ipByte := []byte{}
@@ -246,7 +252,6 @@ func (peerster *Peerster) handleIncomingStatusPacket(packet *messaging.StatusPac
 		if !found {
 			// Other peer doesn't even know about one of the peers in our want, so we just send him this peer's first message here
 			fmt.Printf("Other peer doesn't know about a peer. Sending first message. \n")
-			fmt.Println("WHAT THE HELL", packet.Want, len(packet.Want), i, peerster.ReceivedMessages, len(peerster.ReceivedMessages))
 			if len(peerster.ReceivedMessages[identifier]) >= 1 {
 				firstMessage := peerster.ReceivedMessages[identifier][0]
 				err := peerster.sendToPeer(originAddr.String(), messaging.GossipPacket{
@@ -291,17 +296,12 @@ func (peerster *Peerster) handleIncomingStatusPacket(packet *messaging.StatusPac
 		}
 		if synced {
 			session := peerster.RumormongeringSessions[originAddr.String()].Pointer()
-			peerster.printMessages()
+			//peerster.printMessages()
 			fmt.Printf("IN SYNC WITH %s \n", originAddr.String())
 			//peerster.stopRumormongeringSession(originAddr.String())
 			if session.Active && peerster.considerRumormongering() {
-
-				fmt.Println("We rumormongering now. Session details: ")
-				fmt.Printf("Active: %b, Originalmessage: %q, TimeLeft: %v \n", session.Active, session.Message, session.TimeLeft)
 				targetAddr := peerster.handleIncomingRumor(&session.Message, stringAddrToUDPAddr(peerster.GossipAddress), true)
 				fmt.Printf("FLIPPED COIN sending rumor to %s \n", targetAddr)
-			} else {
-				fmt.Printf("Session inactive? peer: %s value: %v or failed coinflip \n", originAddr.String(), session.Active)
 			}
 			session.SetActive(false)
 		}
@@ -370,6 +370,52 @@ func (peerster Peerster) printMessages() {
 		for j := range peer {
 			fmt.Println(peer[j])
 		}
+	}
+}
+
+func (peerster *Peerster) handleNewMessage(w http.ResponseWriter, req *http.Request) {
+	buffer := make([]byte, 1024)
+	n, err := req.Body.Read(buffer)
+	if err != nil {
+		fmt.Printf("Could not read message from frontend, reason: %s \n", err)
+	}
+	peerster.clientReceive(buffer[:n])
+}
+
+func (peerster *Peerster) handleRegisterNode(w http.ResponseWriter, req *http.Request) {
+	buffer := make([]byte, 1024)
+	n, err := req.Body.Read(buffer)
+	if err != nil {
+		fmt.Printf("Could not register new node from frontend, reason: %s \n", err)
+	}
+	peerster.addToKnownPeers(string(buffer[:n]))
+}
+
+func (peerster *Peerster) handleGetMessages(w http.ResponseWriter, req *http.Request) {
+	b, err := json.Marshal(peerster.ReceivedMessages)
+	if err != nil {
+		fmt.Printf("Could not encode received msgs as json, reason: %s \n", err)
+		return
+	}
+	w.WriteHeader(200)
+	_, err = w.Write(b)
+	if err != nil {
+		fmt.Printf("Could not send messages to frontend, reason: %s \n", err)
+		return
+	}
+
+}
+
+func (peerster *Peerster) listenFrontend() {
+	http.HandleFunc("/new-message", peerster.handleNewMessage)
+	http.HandleFunc("/register-node", peerster.handleRegisterNode)
+	http.HandleFunc("/get-messages", peerster.handleGetMessages)
+
+	http.Handle("/", http.FileServer(http.Dir("./static")))
+
+	err := http.ListenAndServe(":3333", nil)
+	if err != nil {
+		fmt.Printf("Could not listen to the frontend, reason: %s \n", err)
 	}
 }
 
@@ -589,6 +635,7 @@ func main() {
 	addr := stringAddrToUDPAddr(peerster.GossipAddress)
 	fmt.Println(addr.String(), string(addr.IP), peerster.GossipAddress)
 	go peerster.listen(Server)
+	go peerster.listenFrontend()
 	peerster.antiEntropy()
 	peerster.listen(Client)
 
