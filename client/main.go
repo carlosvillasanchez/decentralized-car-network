@@ -3,6 +3,8 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/dedis/protobuf"
+	"github.com/tormey97/Peerster/messaging"
 	"log"
 	"net"
 	//"github.com/TorsteinMeyer/Peerster/messaging"
@@ -33,6 +35,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("Fatal error: PeersterClient was unable to connect. %s", err)
 	}
-	n, err := conn.Write([]byte(client.msg))
+	msg := messaging.Message{Text: client.msg}
+	encoded, err := protobuf.Encode(&msg)
+	if err != nil {
+		log.Fatalf("Fatal error: Could not send message to peerster. %s, \n", err)
+	}
+	n, err := conn.Write(encoded)
 	fmt.Println(err, n)
 }

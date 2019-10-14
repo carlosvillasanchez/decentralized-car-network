@@ -442,7 +442,14 @@ func (peerster *Peerster) listen(origin Origin) {
 		}
 		switch origin {
 		case Client:
-			peerster.clientReceive(buffer)
+			msg := messaging.Message{}
+			err := protobuf.Decode(buffer, &msg)
+			if err != nil {
+				fmt.Printf("Failed to decode message from client, reason: %s \n", err)
+			} else {
+				fmt.Println("THE MESSAGE IS ", msg.Text)
+				peerster.clientReceive([]byte(msg.Text))
+			}
 		case Server:
 			peerster.serverReceive(buffer, *originAddr)
 		}
