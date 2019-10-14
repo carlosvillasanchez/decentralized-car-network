@@ -391,8 +391,8 @@ func (peerster *Peerster) handleRegisterNode(w http.ResponseWriter, req *http.Re
 	peerster.addToKnownPeers(string(buffer[:n]))
 }
 
-func (peerster *Peerster) handleGetMessages(w http.ResponseWriter, req *http.Request) {
-	b, err := json.Marshal(peerster.ReceivedMessages)
+func sendValueAsJson(w http.ResponseWriter, req *http.Request, val interface{}) {
+	b, err := json.Marshal(val)
 	if err != nil {
 		fmt.Printf("Could not encode received msgs as json, reason: %s \n", err)
 		return
@@ -403,17 +403,24 @@ func (peerster *Peerster) handleGetMessages(w http.ResponseWriter, req *http.Req
 		fmt.Printf("Could not send messages to frontend, reason: %s \n", err)
 		return
 	}
+}
 
+func (peerster *Peerster) handleGetMessages(w http.ResponseWriter, req *http.Request) {
+	sendValueAsJson(w, req, peerster.ReceivedMessages)
+}
+
+func (peerster *Peerster) handleGetPeers(w http.ResponseWriter, req *http.Request) {
+	sendValueAsJson(w, req, peerster.KnownPeers)
 }
 
 func (peerster *Peerster) listenFrontend() {
 	http.HandleFunc("/new-message", peerster.handleNewMessage)
 	http.HandleFunc("/register-node", peerster.handleRegisterNode)
 	http.HandleFunc("/get-messages", peerster.handleGetMessages)
-
+	http.HandleFunc("/get-peers", peerster.handleGetPeers)
 	http.Handle("/", http.FileServer(http.Dir("./static")))
 
-	err := http.ListenAndServe(":3333", nil)
+	err := http.ListenAndServe(":8080", nil)
 	if err != nil {
 		fmt.Printf("Could not listen to the frontend, reason: %s \n", err)
 	}

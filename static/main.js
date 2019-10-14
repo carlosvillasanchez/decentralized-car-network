@@ -18,7 +18,7 @@ _httpGet = (url, body, callback) => {
     req.send(body)
 };
 
-url = "http://127.0.0.1:3333";
+url = "http://127.0.0.1:8080";
 
 sendMessage = () => {
     let messageInput = _getValueFromElementById("message-input");
@@ -32,7 +32,7 @@ registerNode = () => {
 
 _listMessages = (newMessages) => {
     for (let i in newMessages) {
-        message = newMessages[i];
+        let message = newMessages[i];
         console.log(message);
         let list = document.getElementById("chat-list");
         let li = document.createElement("li");
@@ -45,6 +45,17 @@ _listMessages = (newMessages) => {
         list.appendChild(li)
     }
 };
+
+_listPeers = (peers) => {
+    let elem = document.getElementById("peer-list");
+    elem.innerHTML = "";
+    for (let i in peers) {
+        let peer = peers[i];
+        let li = document.createElement("li");
+        li.innerHTML = peer;
+        elem.appendChild(li);
+    }
+}
 
 let retrievedMessages = [];
 _pollMessages = () => {
@@ -69,7 +80,10 @@ _pollMessages = () => {
     };
     setInterval(() => {
         _httpGet(url + "/get-messages", [], _addMessages);
-    }, 1000)
+    }, 1000);
+    setInterval(() => {
+        _httpGet(url + "/get-peers", [], _listPeers);
+    }, 1000);
 };
 
 _pollMessages();

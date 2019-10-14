@@ -20,6 +20,10 @@ type RumorMessage struct {
 	Text   string
 }
 
+type Message struct {
+	Text string
+}
+
 type PeerStatus struct {
 	Identifier string
 	NextID     uint32
