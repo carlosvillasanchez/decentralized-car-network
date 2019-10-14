@@ -18,16 +18,16 @@ _httpGet = (url, body, callback) => {
     req.send(body)
 };
 
-url = "http://127.0.0.1:8080";
+url = "http://localhost:8080";
 
 sendMessage = () => {
     let messageInput = _getValueFromElementById("message-input");
-    _httpPost(url + "/new-message", messageInput);
+    _httpPost(url + "/message", messageInput);
 };
 
 registerNode = () => {
     let nodeInput = _getValueFromElementById("node-input");
-    _httpPost(url + "/register-node", nodeInput);
+    _httpPost(url + "/node", nodeInput);
 };
 
 _listMessages = (newMessages) => {
@@ -79,11 +79,20 @@ _pollMessages = () => {
         _listMessages(newMessages)
     };
     setInterval(() => {
-        _httpGet(url + "/get-messages", [], _addMessages);
+        _httpGet(url + "/message", [], _addMessages);
     }, 1000);
     setInterval(() => {
-        _httpGet(url + "/get-peers", [], _listPeers);
+        _httpGet(url + "/node", [], _listPeers);
     }, 1000);
 };
 
+_setId = (response) => {
+    console.log(response);
+    document.getElementById("title").innerHTML = "Peerster ID: " + response;
+};
+_getId = () => {
+    _httpGet(url + "/id", [], _setId);
+};
+
+_getId();
 _pollMessages();
