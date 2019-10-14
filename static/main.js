@@ -55,9 +55,8 @@ _pollMessages = () => {
                 let message = response[node][msg];
                 let found = false;
                 for (let i in retrievedMessages) {
-                    if (retrievedMessages[i].Origin === message.Origin && retrievedMessages[i].Id === message.Id) {
+                    if (retrievedMessages[i].Origin === message.Origin && retrievedMessages[i].ID === message.ID) {
                         found = true;
-                        break;
                     }
                 }
                 if (!found) {
@@ -69,7 +68,7 @@ _pollMessages = () => {
         _listMessages(newMessages)
     };
     setInterval(() => {
-        _httpGet(url + "/get-messages", [], _addMessages)
+        _httpGet(url + "/get-messages", [], _addMessages);
     }, 1000)
 };
 

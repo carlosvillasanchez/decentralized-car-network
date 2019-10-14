@@ -11,10 +11,12 @@
 <body>
 <div class = "main">
     <h3>Peerster</h3>
+    Messages
     <div class = "chat">
         <ul id="chat-list">
         </ul>
     </div>
+
     <form>
         <input id="message-input" type="text" placeholder="Message"/>
         <input type="button" value="Send Message" onclick="sendMessage()"/>
@@ -22,6 +24,15 @@
         <input id="node-input" type="text" placeholder="Node address"/>
         <input type="button" value="Add node" onclick="registerNode()">
     </form>
+
+    Known peers
+    <div class = "chat">
+        <ul id="peer-list">
+            <li>
+                123132
+            </li>
+        </ul>
+    </div>
 </div>
 </body>
 </html>
