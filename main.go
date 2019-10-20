@@ -163,7 +163,7 @@ func (peerster *Peerster) stopRumormongeringSession(peer string) {
 // Handles an incoming rumor message. A zero-value originAddr means the message came from a client.
 func (peerster *Peerster) handleIncomingRumor(rumor *messaging.RumorMessage, originAddr net.UDPAddr, coinflip bool) string {
 	if rumor == nil {
-		return ""
+		return "something"
 	}
 	fmt.Printf("RUMOR origin %s from %s ID %v contents %s \n", rumor.Origin, originAddr.String(), rumor.ID, rumor.Text)
 	peerster.addToWantStruct(rumor.Origin, rumor.ID)
@@ -265,22 +265,23 @@ func (peerster *Peerster) handleIncomingStatusPacket(packet *messaging.StatusPac
 			}
 		}
 	}
-
 	for i := range packet.Want {
 		otherPeerWant := packet.Want[i]
 		myWant := wantMap[otherPeerWant.Identifier]
 		// We check if the peer
-		isKnownPeer := otherPeerWant.NextID > 1 && otherPeerWant.Identifier != peerster.Name
-		if myWant == (messaging.PeerStatus{}) {
+		isKnownPeer := true
+		if myWant == (messaging.PeerStatus{}) && otherPeerWant.Identifier != peerster.Name {
 			//fmt.Printf("unknown peer %q encountered, should send statuspacket \n", otherPeerWant.Identifier)
 			isKnownPeer = false
 			peerster.addToWantStruct(otherPeerWant.Identifier, 1)
 		}
 		statusPacket := messaging.StatusPacket{Want: peerster.Want}
 		gossipPacket := messaging.GossipPacket{Status: &statusPacket}
-		synced := false
+		peerster.printMessages()
 		if isKnownPeer && myWant.NextID > otherPeerWant.NextID {
 			// He's out of date, we transmit messages hes missing (for this particular peer)
+			fmt.Printf("HE IS OUT OF DATE %s \n", originAddr.String())
+			fmt.Printf("This is interesting: mywant %v, theirwant %v, id %s", myWant.NextID, otherPeerWant.NextID, otherPeerWant.Identifier)
 			messages := peerster.getMissingMessages(otherPeerWant.NextID, myWant.NextID, otherPeerWant.Identifier)
 			nextMsg := messages[0]
 			err := peerster.sendToPeer(originAddr.String(), messaging.GossipPacket{
@@ -289,28 +290,27 @@ func (peerster *Peerster) handleIncomingStatusPacket(packet *messaging.StatusPac
 			if err != nil {
 				fmt.Printf("Could not send missing rumor to peer, reason: %s", err)
 			}
-			break
+			return
 		} else if myWant.NextID < otherPeerWant.NextID {
 			// I'm out of date, we send him our status packet saying we are OOD, he should send us msgs
+			fmt.Printf("NOT IN SYNC WITH %s \n", originAddr.String())
+			fmt.Println("Values of interest: ", isKnownPeer, myWant.NextID < otherPeerWant.NextID, myWant.NextID, myWant.Identifier, otherPeerWant.NextID, otherPeerWant.Identifier)
 			err := peerster.sendToPeer(originAddr.String(), gossipPacket, []string{})
 			if err != nil {
 				fmt.Printf("Could not send statuspacket. Reason: %s \n", err)
 			}
-		} else {
-			synced = true
-		}
-		if synced {
-			//peerster.printMessages()
-			fmt.Printf("IN SYNC WITH %s \n", originAddr.String())
-			//peerster.stopRumormongeringSession(originAddr.String())
-			session := peerster.RumormongeringSessions.GetSession(originAddr.String())
-			if session.Active && peerster.considerRumormongering() {
-				targetAddr := peerster.handleIncomingRumor(&session.Message, stringAddrToUDPAddr(peerster.GossipAddress), true)
-				fmt.Printf("FLIPPED COIN sending rumor to %s \n", targetAddr)
-			}
-			peerster.RumormongeringSessions.DeactivateSession(originAddr.String())
+			return
 		}
 	}
+
+	fmt.Printf("IN SYNC WITH %s \n", originAddr.String())
+	peerster.stopRumormongeringSession(originAddr.String())
+	session := peerster.RumormongeringSessions.GetSession(originAddr.String())
+	if session.Active && peerster.considerRumormongering() {
+		targetAddr := peerster.handleIncomingRumor(&session.Message, stringAddrToUDPAddr(peerster.GossipAddress), true)
+		fmt.Printf("FLIPPED COIN sending rumor to %s \n", targetAddr)
+	}
+	peerster.RumormongeringSessions.DeactivateSession(originAddr.String())
 }
 
 func (peerster *Peerster) considerRumormongering() bool {
@@ -498,6 +498,9 @@ func (peerster *Peerster) addToReceivedMessages(rumor messaging.RumorMessage) bo
 
 // Adds a new peer (given its unique identifier) to the peerster's Want structure.
 func (peerster *Peerster) addToWantStruct(peerIdentifier string, initialSeqId uint32) { //TODO remove initialseqid
+	if peerIdentifier == "" {
+		return
+	}
 	for i := range peerster.Want {
 		if peerster.Want[i].Identifier == peerIdentifier {
 			return
@@ -641,7 +644,7 @@ func createPeerster() Peerster {
 	name := flag.String("name", "nodeA", "the Name of the node")
 	peers := flag.String("peers", "", "known peers")
 	simple := flag.Bool("simple", false, "Simple mode")
-	antiEntropy := flag.Int("antiEntropy", 1, "Anti entropy timer")
+	antiEntropy := flag.Int("antiEntropy", 10, "Anti entropy timer")
 	flag.Parse()
 	peersList := []string{}
 	if *peers != "" {
