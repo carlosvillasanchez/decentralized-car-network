@@ -1,6 +1,8 @@
 package messaging
 
-import "sync"
+import (
+	"sync"
+)
 
 type SimpleMessage struct {
 	OriginalName  string
@@ -37,21 +39,82 @@ type RumormongeringSession struct {
 	Message  RumorMessage
 	TimeLeft int
 	Active   bool
-	Mutex    sync.Mutex
+	Mutex    sync.RWMutex
 }
 
 func (r *RumormongeringSession) DecrementTimer() {
+	r.Mutex.Lock()
 	r.TimeLeft--
+	r.Mutex.Unlock()
 }
 
 func (r *RumormongeringSession) ResetTimer() {
+	r.Mutex.Lock()
 	r.TimeLeft = 10
+	r.Mutex.Unlock()
 }
 
 func (r *RumormongeringSession) SetActive(value bool) {
+	r.Mutex.Lock()
 	r.Active = value
+	r.Mutex.Unlock()
 }
 
-func (r RumormongeringSession) Pointer() *RumormongeringSession {
-	return &r
+type AtomicRumormongeringSessionMap struct {
+	RumormongeringSessions map[string]RumormongeringSession
+	Mutex                  sync.RWMutex
+}
+
+func (a *AtomicRumormongeringSessionMap) GetSession(index string) (session RumormongeringSession) {
+	a.Mutex.RLock()
+	session = a.RumormongeringSessions[index]
+	a.Mutex.RUnlock()
+	return
+}
+
+func (a *AtomicRumormongeringSessionMap) SetSession(index string, value RumormongeringSession) {
+	a.Mutex.Lock()
+	a.RumormongeringSessions[index] = value
+	a.Mutex.Unlock()
+}
+
+// Sets the active value of a session to True if it's not already active.
+// Returns whether the active value was set to true or not.
+// This method needs to be thread safe since it will start a goroutine that should only run once
+func (a *AtomicRumormongeringSessionMap) ActivateSession(index string) bool {
+	a.Mutex.Lock()
+	session := a.RumormongeringSessions[index]
+	if !session.Active {
+		session.SetActive(true)
+		session.ResetTimer()
+		a.RumormongeringSessions[index] = session
+		a.Mutex.Unlock()
+		return true
+	}
+	a.Mutex.Unlock()
+	return false
+}
+
+func (a *AtomicRumormongeringSessionMap) DecrementTimer(index string) {
+	a.Mutex.Lock()
+	session := a.RumormongeringSessions[index]
+	session.DecrementTimer()
+	a.RumormongeringSessions[index] = session
+	a.Mutex.Unlock()
+}
+
+func (a *AtomicRumormongeringSessionMap) DeactivateSession(index string) {
+	a.Mutex.Lock()
+	session := a.RumormongeringSessions[index]
+	session.SetActive(false)
+	a.RumormongeringSessions[index] = session
+	a.Mutex.Unlock()
+}
+
+func (a *AtomicRumormongeringSessionMap) ResetTimer(index string) {
+	a.Mutex.Lock()
+	session := a.RumormongeringSessions[index]
+	session.ResetTimer()
+	a.RumormongeringSessions[index] = session
+	a.Mutex.Unlock()
 }
