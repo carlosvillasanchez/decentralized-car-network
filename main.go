@@ -36,6 +36,7 @@ type Peerster struct {
 	ReceivedMessages       map[string][]messaging.RumorMessage
 	RumormongeringSessions map[string]messaging.RumormongeringSession //TODO is this necessary?
 	Conn                   net.UDPConn
+	NextHopTable           map[string]string
 }
 
 func stringAddrToUDPAddr(addr string) net.UDPAddr {
@@ -638,10 +639,15 @@ func createPeerster() Peerster {
 	simple := flag.Bool("simple", false, "Simple mode")
 	antiEntropy := flag.Int("antiEntropy", 10, "Anti entropy timer")
 	flag.Parse()
+	peersList := []string{}
+	if *peers != "" {
+		peersList = strings.Split(*peers, ",")
+	}
+	fmt.Println(peersList, *peers, "???")
 	return Peerster{
 		UIPort:                 *UIPort,
 		GossipAddress:          *gossipAddr,
-		KnownPeers:             strings.Split(*peers, ","),
+		KnownPeers:             peersList,
 		Name:                   *name,
 		Simple:                 *simple,
 		AntiEntropyTimer:       *antiEntropy,
