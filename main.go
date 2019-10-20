@@ -237,7 +237,7 @@ func (peerster *Peerster) handleIncomingStatusPacket(packet *messaging.StatusPac
 	fmt.Println()
 	// End printing
 	session := peerster.RumormongeringSessions[originAddr.String()]
-	session.ResetTimer() //TODO is this the appropriate place to reset the timer?
+	session.ResetTimer() //TODO this doesn't actually assign anything.
 	wantMap := createWantMap(peerster.Want)
 
 	//Handles the case where the other peer doesn't even know about a certain peer we know about
@@ -250,6 +250,7 @@ func (peerster *Peerster) handleIncomingStatusPacket(packet *messaging.StatusPac
 				break
 			}
 		}
+
 		if !found {
 			// Other peer doesn't even know about one of the peers in our want, so we just send him this peer's first message here
 			fmt.Printf("Other peer doesn't know about a peer. Sending first message. \n")
@@ -269,13 +270,17 @@ func (peerster *Peerster) handleIncomingStatusPacket(packet *messaging.StatusPac
 	for i := range packet.Want {
 		otherPeerWant := packet.Want[i]
 		myWant := wantMap[otherPeerWant.Identifier]
+		// We check if the peer
+		isKnownPeer := otherPeerWant.NextID > 1 && otherPeerWant.Identifier != peerster.Name
 		if myWant == (messaging.PeerStatus{}) {
-			return //TODO this situation means we don't have the peer registered, idk what to do then, add to list of peers?
+			fmt.Printf("unknown peer %q encountered, should send statuspacket \n", otherPeerWant.Identifier)
+			isKnownPeer = false
+			peerster.addToWantStruct(otherPeerWant.Identifier, 1)
 		}
 		statusPacket := messaging.StatusPacket{Want: peerster.Want}
 		gossipPacket := messaging.GossipPacket{Status: &statusPacket}
 		synced := false
-		if myWant.NextID > otherPeerWant.NextID {
+		if isKnownPeer && myWant.NextID > otherPeerWant.NextID {
 			// He's out of date, we transmit messages hes missing (for this particular peer)
 			messages := peerster.getMissingMessages(otherPeerWant.NextID, myWant.NextID, otherPeerWant.Identifier)
 			nextMsg := messages[0]
@@ -286,7 +291,7 @@ func (peerster *Peerster) handleIncomingStatusPacket(packet *messaging.StatusPac
 				fmt.Printf("Could not send missing rumor to peer, reason: %s", err)
 			}
 			break
-		} else if myWant.NextID < otherPeerWant.NextID {
+		} else if !isKnownPeer || myWant.NextID < otherPeerWant.NextID {
 			// I'm out of date, we send him our status packet saying we are OOD, he should send us msgs
 			err := peerster.sendToPeer(originAddr.String(), gossipPacket, []string{})
 			if err != nil {
