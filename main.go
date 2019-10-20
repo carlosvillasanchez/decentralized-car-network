@@ -150,7 +150,7 @@ func (peerster *Peerster) startRumormongeringSession(peer string, message messag
 			peerster.RumormongeringSessions.DeactivateSession(peer)
 		}()
 	} else {
-		session.ResetTimer()
+		peerster.RumormongeringSessions.ResetTimer(peer)
 		return fmt.Errorf("attempted to start a rumormongering session with %q, but one was already active \n", peer)
 	}
 	return nil
@@ -265,23 +265,22 @@ func (peerster *Peerster) handleIncomingStatusPacket(packet *messaging.StatusPac
 			}
 		}
 	}
+	statusPacket := messaging.StatusPacket{Want: peerster.Want}
+	gossipPacket := messaging.GossipPacket{Status: &statusPacket}
+	shouldSendStatusPacket := false
 	for i := range packet.Want {
 		otherPeerWant := packet.Want[i]
 		myWant := wantMap[otherPeerWant.Identifier]
 		// We check if the peer
-		isKnownPeer := true
 		if myWant == (messaging.PeerStatus{}) && otherPeerWant.Identifier != peerster.Name {
 			//fmt.Printf("unknown peer %q encountered, should send statuspacket \n", otherPeerWant.Identifier)
-			isKnownPeer = false
 			peerster.addToWantStruct(otherPeerWant.Identifier, 1)
 		}
-		statusPacket := messaging.StatusPacket{Want: peerster.Want}
-		gossipPacket := messaging.GossipPacket{Status: &statusPacket}
 		peerster.printMessages()
-		if isKnownPeer && myWant.NextID > otherPeerWant.NextID {
+		if myWant.NextID > otherPeerWant.NextID {
 			// He's out of date, we transmit messages hes missing (for this particular peer)
 			fmt.Printf("HE IS OUT OF DATE %s \n", originAddr.String())
-			fmt.Printf("This is interesting: mywant %v, theirwant %v, id %s", myWant.NextID, otherPeerWant.NextID, otherPeerWant.Identifier)
+			fmt.Printf("This is interesting: mywant %v, theirwant %v, id %s \n", myWant.NextID, otherPeerWant.NextID, otherPeerWant.Identifier)
 			messages := peerster.getMissingMessages(otherPeerWant.NextID, myWant.NextID, otherPeerWant.Identifier)
 			nextMsg := messages[0]
 			err := peerster.sendToPeer(originAddr.String(), messaging.GossipPacket{
@@ -294,23 +293,26 @@ func (peerster *Peerster) handleIncomingStatusPacket(packet *messaging.StatusPac
 		} else if myWant.NextID < otherPeerWant.NextID {
 			// I'm out of date, we send him our status packet saying we are OOD, he should send us msgs
 			fmt.Printf("NOT IN SYNC WITH %s \n", originAddr.String())
-			fmt.Println("Values of interest: ", isKnownPeer, myWant.NextID < otherPeerWant.NextID, myWant.NextID, myWant.Identifier, otherPeerWant.NextID, otherPeerWant.Identifier)
-			err := peerster.sendToPeer(originAddr.String(), gossipPacket, []string{})
-			if err != nil {
-				fmt.Printf("Could not send statuspacket. Reason: %s \n", err)
-			}
-			return
+			fmt.Println("Values of interest: ", myWant.NextID < otherPeerWant.NextID, myWant.NextID, myWant.Identifier, otherPeerWant.NextID, otherPeerWant.Identifier)
+			shouldSendStatusPacket = true
+		}
+	}
+
+	if shouldSendStatusPacket {
+		err := peerster.sendToPeer(originAddr.String(), gossipPacket, []string{})
+		if err != nil {
+			fmt.Printf("Could not send statuspacket. Reason: %s \n", err)
 		}
 	}
 
 	fmt.Printf("IN SYNC WITH %s \n", originAddr.String())
-	peerster.stopRumormongeringSession(originAddr.String())
+
 	session := peerster.RumormongeringSessions.GetSession(originAddr.String())
 	if session.Active && peerster.considerRumormongering() {
 		targetAddr := peerster.handleIncomingRumor(&session.Message, stringAddrToUDPAddr(peerster.GossipAddress), true)
 		fmt.Printf("FLIPPED COIN sending rumor to %s \n", targetAddr)
 	}
-	peerster.RumormongeringSessions.DeactivateSession(originAddr.String())
+	peerster.stopRumormongeringSession(originAddr.String())
 }
 
 func (peerster *Peerster) considerRumormongering() bool {
@@ -331,7 +333,8 @@ func (peerster *Peerster) chooseRandomPeer() (string, error) {
 	if validPeers == nil {
 		return "", errors.New("slice of valid peers is empty/nil")
 	}
-	return validPeers[rand.Intn(len(validPeers))], nil
+	num := rand.Intn(len(validPeers))
+	return validPeers[num], nil
 }
 
 func (peerster *Peerster) serverReceive(buffer []byte, originAddr net.UDPAddr) {
