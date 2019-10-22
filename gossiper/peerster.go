@@ -32,6 +32,7 @@ type Peerster struct {
 	ReceivedMessages       map[string][]messaging.RumorMessage
 	RumormongeringSessions messaging.AtomicRumormongeringSessionMap //TODO is this necessary?
 	Conn                   net.UDPConn
+	RTimer                 int
 	NextHopTable           map[string]string
 }
 
@@ -59,26 +60,44 @@ func (peerster *Peerster) createConnection(origin Origin) (net.UDPConn, error) {
 	return *udpConn, nil
 }
 
-func (peerster *Peerster) clientReceive(buffer []byte) {
-	fmt.Println("CLIENT MESSAGE " + string(buffer)) //TODO use Message struct
+func (peerster *Peerster) clientReceive(message messaging.Message) {
+	fmt.Println("CLIENT MESSAGE " + message.Text)
 
 	if peerster.Simple {
-		packet := messaging.GossipPacket{Simple: peerster.createSimpleMessage(string(buffer))}
+		packet := messaging.GossipPacket{Simple: peerster.createSimpleMessage(message.Text)}
 		err := peerster.sendToKnownPeers(packet, []string{})
 		if err != nil {
 			fmt.Printf("Error: could not send receivedPacket from client, reason: %s \n", err)
 		}
 	} else {
-		rumor := messaging.RumorMessage{
-			Origin: peerster.Name,
-			ID:     peerster.MsgSeqNumber,
-			Text:   string(buffer),
+		if message.Destination == nil || *message.Destination == "" {
+			peerster.sendNewRumorMessage(message.Text)
+		} else {
+			peerster.sendNewPrivateMessage(message)
 		}
-		peerster.MsgSeqNumber = peerster.MsgSeqNumber + 1
-		peerster.handleIncomingRumor(&rumor, messaging.StringAddrToUDPAddr(peerster.GossipAddress), false)
 	}
 }
 
+func (peerster *Peerster) sendNewRumorMessage(text string) {
+	rumor := messaging.RumorMessage{
+		Origin: peerster.Name,
+		ID:     peerster.MsgSeqNumber,
+		Text:   text,
+	}
+	peerster.MsgSeqNumber = peerster.MsgSeqNumber + 1
+	peerster.handleIncomingRumor(&rumor, messaging.StringAddrToUDPAddr(peerster.GossipAddress), false)
+}
+
+func (peerster *Peerster) sendNewPrivateMessage(msg messaging.Message) {
+	private := messaging.PrivateMessage{
+		Origin:      peerster.Name,
+		ID:          0,
+		Text:        msg.Text,
+		Destination: *msg.Destination,
+		HopLimit:    11,
+	}
+	peerster.handleIncomingPrivateMessage(&private, messaging.StringAddrToUDPAddr(peerster.GossipAddress))
+}
 func (peerster *Peerster) startRumormongeringSession(peer string, message messaging.RumorMessage) error {
 	session := peerster.RumormongeringSessions.GetSession(peer)
 	if session == (messaging.RumormongeringSession{}) {
@@ -121,11 +140,15 @@ func (peerster *Peerster) stopRumormongeringSession(peer string) {
 // Handles an incoming rumor message. A zero-value originAddr means the message came from a client.
 func (peerster *Peerster) handleIncomingRumor(rumor *messaging.RumorMessage, originAddr net.UDPAddr, coinflip bool) string {
 	if rumor == nil {
-		return "something"
+		return ""
 	}
 	fmt.Printf("RUMOR origin %s from %s ID %v contents %s \n", rumor.Origin, originAddr.String(), rumor.ID, rumor.Text)
 	peerster.addToWantStruct(rumor.Origin, rumor.ID)
 	peerster.addToReceivedMessages(*rumor)
+	peerster.addToNextHopTable(rumor.Origin, originAddr.String())
+	if rumor.Text != "" {
+		fmt.Printf("DSDV %s %s \n", rumor.Origin, originAddr.String())
+	}
 	isNew := peerster.updateWantStruct(rumor.Origin, rumor.ID)
 	isFromMyself := originAddr.String() == peerster.GossipAddress
 	peer := ""
@@ -183,6 +206,29 @@ func (peerster *Peerster) sendStatusPacket(peer string) error {
 	return peerster.sendToPeer(peer, packet, []string{})
 }
 
+func (peerster *Peerster) handleIncomingPrivateMessage(message *messaging.PrivateMessage, originAddr net.UDPAddr) {
+	if message == nil {
+		return
+	}
+	if message.Destination == peerster.Name {
+		fmt.Printf("PRIVATE MESSAGE origin %s text %s hopLimit %v", message.Origin, message.Text, message.HopLimit)
+	} else {
+		if message.HopLimit == 0 {
+			return
+		}
+		nextHopAddr, ok := peerster.NextHopTable[message.Destination]
+		if ok {
+			message.HopLimit--
+			err := peerster.sendToPeer(nextHopAddr, messaging.GossipPacket{Private: message}, []string{})
+			if err != nil {
+				fmt.Printf("Unable to send private message to %s, reason: %s \n", nextHopAddr, err)
+			}
+		} else {
+			fmt.Printf("Couldn't find %s in next hop table \n", message.Destination)
+		}
+	}
+}
+
 func (peerster *Peerster) handleIncomingStatusPacket(packet *messaging.StatusPacket, originAddr net.UDPAddr) {
 	if packet == nil {
 		return
@@ -234,7 +280,7 @@ func (peerster *Peerster) handleIncomingStatusPacket(packet *messaging.StatusPac
 			//fmt.Printf("unknown peer %q encountered, should send statuspacket \n", otherPeerWant.Identifier)
 			peerster.addToWantStruct(otherPeerWant.Identifier, 1)
 		}
-		peerster.printMessages()
+		//peerster.printMessages()
 		if myWant.NextID > otherPeerWant.NextID {
 			// He's out of date, we transmit messages hes missing (for this particular peer)
 			messages := peerster.getMissingMessages(otherPeerWant.NextID, myWant.NextID, otherPeerWant.Identifier)
@@ -306,6 +352,7 @@ func (peerster *Peerster) serverReceive(buffer []byte, originAddr net.UDPAddr) {
 	if !peerster.Simple {
 		peerster.handleIncomingRumor(receivedPacket.Rumor, originAddr, false)
 		peerster.handleIncomingStatusPacket(receivedPacket.Status, originAddr)
+		peerster.handleIncomingPrivateMessage(receivedPacket.Private, originAddr)
 	} else {
 		//TODO Handle SimpleMessage and Rumor cases differently. If it's a simplemessage, the relay origin addr is probably inside the message
 
@@ -358,7 +405,7 @@ func (peerster *Peerster) Listen(origin Origin) {
 				fmt.Printf("Failed to decode message from client, reason: %s \n", err)
 			} else {
 				//fmt.Println("THE MESSAGE IS ", msg.Text)
-				peerster.clientReceive([]byte(msg.Text))
+				peerster.clientReceive(msg)
 			}
 		case Server:
 			peerster.serverReceive(buffer, *originAddr)

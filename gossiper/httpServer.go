@@ -3,6 +3,7 @@ package gossiper
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/tormey97/Peerster/messaging"
 	"net/http"
 )
 
@@ -12,7 +13,18 @@ func (peerster *Peerster) handleNewMessage(w http.ResponseWriter, req *http.Requ
 	if err != nil {
 		fmt.Printf("Could not read message from frontend, reason: %s \n", err)
 	}
-	peerster.clientReceive(buffer[:n])
+	decoded := decodeJson(string(buffer[:n]))
+	text := decoded["message"].(string)
+	destination := decoded["destination"]
+	destinationString := ""
+	if destination != nil {
+		destinationString = destination.(string)
+	}
+	message := messaging.Message{
+		Text:        text,
+		Destination: &destinationString,
+	}
+	peerster.clientReceive(message)
 }
 
 func (peerster *Peerster) handleRegisterNode(w http.ResponseWriter, req *http.Request) {
@@ -22,6 +34,11 @@ func (peerster *Peerster) handleRegisterNode(w http.ResponseWriter, req *http.Re
 		fmt.Printf("Could not register new node from frontend, reason: %s \n", err)
 	}
 	peerster.addToKnownPeers(string(buffer[:n]))
+}
+
+func decodeJson(jsonString string) (decoded map[string]interface{}) {
+	_ = json.Unmarshal([]byte(jsonString), &decoded)
+	return
 }
 
 func sendValueAsJson(w http.ResponseWriter, req *http.Request, val interface{}) {
@@ -60,10 +77,15 @@ func (peerster *Peerster) handleId(w http.ResponseWriter, req *http.Request) {
 	sendValueAsJson(w, req, peerster.Name)
 }
 
+func (peerster *Peerster) handleHopTable(w http.ResponseWriter, req *http.Request) {
+	sendValueAsJson(w, req, peerster.NextHopTable)
+}
+
 func (peerster *Peerster) ListenFrontend() {
 	http.HandleFunc("/message", peerster.handleMessage)
 	http.HandleFunc("/node", peerster.handlePeers)
 	http.HandleFunc("/id", peerster.handleId)
+	http.HandleFunc("/hop-table", peerster.handleHopTable)
 	http.Handle("/", http.FileServer(http.Dir("./static")))
 
 	err := http.ListenAndServe(":8080", nil)

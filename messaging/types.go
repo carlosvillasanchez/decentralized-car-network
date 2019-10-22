@@ -10,10 +10,19 @@ type SimpleMessage struct {
 	Contents      string
 }
 
+type PrivateMessage struct {
+	Origin      string
+	ID          uint32
+	Text        string
+	Destination string
+	HopLimit    uint32
+}
+
 type GossipPacket struct {
-	Simple *SimpleMessage
-	Rumor  *RumorMessage
-	Status *StatusPacket
+	Simple  *SimpleMessage
+	Rumor   *RumorMessage
+	Status  *StatusPacket
+	Private *PrivateMessage
 }
 
 type RumorMessage struct {
@@ -23,7 +32,8 @@ type RumorMessage struct {
 }
 
 type Message struct {
-	Text string
+	Text        string
+	Destination *string
 }
 
 type PeerStatus struct {

@@ -1,3 +1,6 @@
+let retrievedMessages = [];
+let privateMessageTarget = "";
+
 _getValueFromElementById = (id) => {
     return document.getElementById(id).value;
 };
@@ -22,12 +25,17 @@ url = "http://localhost:8080";
 
 sendMessage = () => {
     let messageInput = _getValueFromElementById("message-input");
-    _httpPost(url + "/message", messageInput);
+    _httpPost(url + "/message", JSON.stringify({message: messageInput, destination: privateMessageTarget}));
 };
 
 registerNode = () => {
     let nodeInput = _getValueFromElementById("node-input");
     _httpPost(url + "/node", nodeInput);
+};
+
+selectPrivateMsgRecipient = (id) => {
+    privateMessageTarget = id;
+    document.getElementById("selected-recipient").innerHTML = "Selected recipient: " + id
 };
 
 _listMessages = (newMessages) => {
@@ -55,9 +63,21 @@ _listPeers = (peers) => {
         li.innerHTML = peer;
         elem.appendChild(li);
     }
-}
+};
 
-let retrievedMessages = [];
+_listHopTable = (hops) => {
+    let elem = document.getElementById("hop-list");
+    elem.innerHTML = "";
+    for (let i in hops) {
+        let li = document.createElement("li");
+        li.onclick = () => {
+            selectPrivateMsgRecipient(i);
+        };
+        li.innerHTML = i;
+        elem.appendChild(li);
+    }
+};
+
 _pollMessages = () => {
     let _addMessages = (response) => {
         let newMessages = [];
@@ -80,8 +100,7 @@ _pollMessages = () => {
     };
     setInterval(() => {
         _httpGet(url + "/message", [], _addMessages);
-    }, 1000);
-    setInterval(() => {
+        _httpGet(url + "/hop-table", [], _listHopTable);
         _httpGet(url + "/node", [], _listPeers);
     }, 1000);
 };

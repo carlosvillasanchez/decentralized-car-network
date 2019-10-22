@@ -7,3 +7,12 @@
     height: 300px;
     overflow-y: scroll;
 }
+
+#hop-list li{
+    cursor: pointer;
+}
+
+#hop-list li:hover {
+    color: #B33;
+    cursor: pointer;
+}

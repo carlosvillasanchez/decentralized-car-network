@@ -26,6 +26,7 @@ func createPeerster() gossiper.Peerster {
 	peers := flag.String("peers", "", "known peers")
 	simple := flag.Bool("simple", false, "Simple mode")
 	antiEntropy := flag.Int("antiEntropy", 10, "Anti entropy timer")
+	rTimer := flag.Int("rtimer", 0, "Route rumor message interval timer")
 	flag.Parse()
 	peersList := []string{}
 	if *peers != "" {
@@ -47,6 +48,8 @@ func createPeerster() gossiper.Peerster {
 		MsgSeqNumber:     1,
 		Want:             []messaging.PeerStatus{},
 		Conn:             net.UDPConn{},
+		RTimer:           *rTimer,
+		NextHopTable:     map[string]string{},
 	}
 }
 
@@ -61,5 +64,7 @@ func main() {
 	go peerster.Listen(gossiper.Server)
 	go peerster.ListenFrontend()
 	peerster.AntiEntropy()
+	peerster.SendRouteMessage()
+	peerster.SendRouteMessages()
 	peerster.Listen(gossiper.Client)
 }

@@ -24,12 +24,21 @@
         <input id="node-input" type="text" placeholder="Node address"/>
         <input type="button" value="Add node" onclick="registerNode()">
     </form>
-
+    <br/>
+    Choose private message recipient <button onclick="selectPrivateMsgRecipient(null)">Clear</button>
+    <br/>
+    <span id = "selected-recipient">Selected recipient: null</span>
+    <div class = "hop-table">
+        <ul id="hop-list">
+        </ul>
+    </div>
+    <br/>
     Known peers
     <div class = "chat">
         <ul id="peer-list">
         </ul>
     </div>
+
 </div>
 </body>
 </html>
