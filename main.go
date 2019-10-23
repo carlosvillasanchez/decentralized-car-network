@@ -44,12 +44,13 @@ func createPeerster() gossiper.Peerster {
 			RumormongeringSessions: map[string]messaging.RumormongeringSession{},
 			Mutex:                  sync.RWMutex{},
 		},
-		ReceivedMessages: map[string][]messaging.RumorMessage{},
-		MsgSeqNumber:     1,
-		Want:             []messaging.PeerStatus{},
-		Conn:             net.UDPConn{},
-		RTimer:           *rTimer,
-		NextHopTable:     map[string]string{},
+		ReceivedMessages:        map[string][]messaging.RumorMessage{},
+		ReceivedPrivateMessages: map[string][]messaging.PrivateMessage{},
+		MsgSeqNumber:            1,
+		Want:                    []messaging.PeerStatus{},
+		Conn:                    net.UDPConn{},
+		RTimer:                  *rTimer,
+		NextHopTable:            map[string]string{},
 	}
 }
 

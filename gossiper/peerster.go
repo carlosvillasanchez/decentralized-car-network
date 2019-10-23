@@ -21,19 +21,20 @@ const (
 )
 
 type Peerster struct {
-	UIPort                 string
-	GossipAddress          string
-	KnownPeers             []string
-	Name                   string
-	Simple                 bool
-	AntiEntropyTimer       int
-	Want                   []messaging.PeerStatus
-	MsgSeqNumber           uint32
-	ReceivedMessages       map[string][]messaging.RumorMessage
-	RumormongeringSessions messaging.AtomicRumormongeringSessionMap //TODO is this necessary?
-	Conn                   net.UDPConn
-	RTimer                 int
-	NextHopTable           map[string]string
+	UIPort                  string
+	GossipAddress           string
+	KnownPeers              []string
+	Name                    string
+	Simple                  bool
+	AntiEntropyTimer        int
+	Want                    []messaging.PeerStatus
+	MsgSeqNumber            uint32
+	ReceivedMessages        map[string][]messaging.RumorMessage
+	ReceivedPrivateMessages map[string][]messaging.PrivateMessage
+	RumormongeringSessions  messaging.AtomicRumormongeringSessionMap //TODO is this necessary?
+	Conn                    net.UDPConn
+	RTimer                  int
+	NextHopTable            map[string]string
 }
 
 func (peerster *Peerster) String() string {
@@ -211,7 +212,8 @@ func (peerster *Peerster) handleIncomingPrivateMessage(message *messaging.Privat
 		return
 	}
 	if message.Destination == peerster.Name {
-		fmt.Printf("PRIVATE MESSAGE origin %s text %s hopLimit %v", message.Origin, message.Text, message.HopLimit)
+		fmt.Printf("PRIVATE MESSAGE origin %s hop-limit %v contents %s \n", message.Origin, message.HopLimit, message.Text)
+		peerster.addToPrivateMessages(*message)
 	} else {
 		if message.HopLimit == 0 {
 			return
@@ -418,6 +420,15 @@ func (peerster *Peerster) registerNewPeer(address, peerIdentifier string, initia
 	peerster.addToWantStruct(peerIdentifier, initialSeqId)
 }
 
+func (peerster *Peerster) addToPrivateMessages(private messaging.PrivateMessage) {
+	privateMessagesFromPeer, ok := peerster.ReceivedPrivateMessages[private.Origin]
+	if !ok {
+		peerster.ReceivedPrivateMessages[private.Origin] = []messaging.PrivateMessage{}
+		privateMessagesFromPeer = peerster.ReceivedPrivateMessages[private.Origin]
+	}
+	peerster.ReceivedPrivateMessages[private.Origin] = append(privateMessagesFromPeer, private)
+}
+
 // Adds a new message to the list of received messages, if it has not already been received.
 // Returns a boolean signifying whether the rumor was new or not
 func (peerster *Peerster) addToReceivedMessages(rumor messaging.RumorMessage) bool {
@@ -428,7 +439,7 @@ func (peerster *Peerster) addToReceivedMessages(rumor messaging.RumorMessage) bo
 	}
 	fmt.Printf("RumorID: %v, lenmsgs: %v, origin: %s \n", rumor.ID, len(messagesFromPeer), rumor.Origin)
 	if int(rumor.ID)-1 == len(messagesFromPeer) {
-		//fmt.Println("We get to this positoin, whats up", rumor.ID, rumor.Origin, len(messagesFromPeer))
+		//fmt.Println("We get to this position, whats up", rumor.ID, rumor.Origin, len(messagesFromPeer))
 		peerster.ReceivedMessages[rumor.Origin] = append(peerster.ReceivedMessages[rumor.Origin], rumor)
 		return true
 	}

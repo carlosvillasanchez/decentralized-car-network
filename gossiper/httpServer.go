@@ -55,10 +55,19 @@ func sendValueAsJson(w http.ResponseWriter, req *http.Request, val interface{}) 
 	}
 }
 
+func (peerster *Peerster) sendMessages(w http.ResponseWriter, req *http.Request) {
+	allMessages := struct {
+		PrivateMessages map[string][]messaging.PrivateMessage
+		RumorMessages   map[string][]messaging.RumorMessage
+	}{PrivateMessages: peerster.ReceivedPrivateMessages,
+		RumorMessages: peerster.ReceivedMessages}
+	sendValueAsJson(w, req, allMessages)
+}
+
 func (peerster *Peerster) handleMessage(w http.ResponseWriter, req *http.Request) {
 	switch req.Method {
 	case http.MethodGet:
-		sendValueAsJson(w, req, peerster.ReceivedMessages)
+		peerster.sendMessages(w, req)
 	case http.MethodPost:
 		peerster.handleNewMessage(w, req)
 	}

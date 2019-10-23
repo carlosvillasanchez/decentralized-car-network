@@ -1,4 +1,5 @@
 let retrievedMessages = [];
+let privateMessages = [];
 let privateMessageTarget = "";
 
 _getValueFromElementById = (id) => {
@@ -41,13 +42,19 @@ selectPrivateMsgRecipient = (id) => {
 _listMessages = (newMessages) => {
     for (let i in newMessages) {
         let message = newMessages[i];
-        console.log(message);
+        if (message["Text"] === ""){
+            continue
+        }
         let list = document.getElementById("chat-list");
         let li = document.createElement("li");
         let b = document.createElement("b");
         b.innerHTML = message["Origin"] + ":";
         let span = document.createElement("span");
-        span.innerHTML = message["Text"];
+        let privateString = "";
+        if (message["ID"] === 0) {
+            privateString = "PRIVATE: "
+        }
+        span.innerHTML = privateString + message["Text"];
         li.appendChild(b);
         li.appendChild(span);
         list.appendChild(li)
@@ -81,20 +88,23 @@ _listHopTable = (hops) => {
 _pollMessages = () => {
     let _addMessages = (response) => {
         let newMessages = [];
-        for (let node in response) {
-            for (let msg in response[node]) {
-                let message = response[node][msg];
-                let found = false;
-                for (let i in retrievedMessages) {
-                    if (retrievedMessages[i].Origin === message.Origin && retrievedMessages[i].ID === message.ID) {
-                        found = true;
+        for (let type in response) {
+            for (let node in response[type]) {
+                for (let msg in response[type][node]) {
+                    let message = response[type][node][msg];
+                    let found = false;
+                    for (let i in retrievedMessages) {
+                        if (retrievedMessages[i].Origin === message.Origin && (message.ID !== 0 && retrievedMessages[i].ID === message.ID)) {
+                            found = true;
+                        }
                     }
-                }
-                if (!found) {
-                    newMessages.push(message);
+                    if (!found) {
+                        newMessages.push(message);
+                    }
                 }
             }
         }
+
         retrievedMessages = retrievedMessages.concat(newMessages);
         _listMessages(newMessages)
     };
@@ -102,7 +112,8 @@ _pollMessages = () => {
         _httpGet(url + "/message", [], _addMessages);
         _httpGet(url + "/hop-table", [], _listHopTable);
         _httpGet(url + "/node", [], _listPeers);
-    }, 1000);
+    }, 1000)
+
 };
 
 _setId = (response) => {
