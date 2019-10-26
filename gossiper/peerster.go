@@ -35,6 +35,7 @@ type Peerster struct {
 	Conn                    net.UDPConn
 	RTimer                  int
 	NextHopTable            map[string]string
+	SharedFiles             []SharedFile
 }
 
 func (peerster *Peerster) String() string {

@@ -45,6 +45,21 @@ type StatusPacket struct {
 	Want []PeerStatus
 }
 
+type DataRequest struct {
+	Origin      string
+	Destination string
+	HopLimit    uint32
+	HashValue   []byte
+}
+
+type DataReply struct {
+	Origin      string
+	Destination string
+	HopLimit    uint32
+	HashValue   []byte
+	Data        []byte
+}
+
 type RumormongeringSession struct {
 	Message  RumorMessage
 	TimeLeft int

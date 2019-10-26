@@ -90,11 +90,20 @@ func (peerster *Peerster) handleHopTable(w http.ResponseWriter, req *http.Reques
 	sendValueAsJson(w, req, peerster.NextHopTable)
 }
 
+func (peerster *Peerster) handleFileShare(w http.ResponseWriter, req *http.Request) {
+	err := req.ParseMultipartForm(0)
+	if err != nil {
+		fmt.Println(err)
+	}
+	fmt.Println(req.FormFile("file"))
+}
+
 func (peerster *Peerster) ListenFrontend() {
 	http.HandleFunc("/message", peerster.handleMessage)
 	http.HandleFunc("/node", peerster.handlePeers)
 	http.HandleFunc("/id", peerster.handleId)
 	http.HandleFunc("/hop-table", peerster.handleHopTable)
+	http.HandleFunc("/file-share", peerster.handleFileShare)
 	http.Handle("/", http.FileServer(http.Dir("./static")))
 
 	err := http.ListenAndServe(":8080", nil)

@@ -14,6 +14,7 @@ type PeersterClient struct {
 	UIPort string
 	msg    string
 	dest   string
+	file   string
 }
 
 func (client PeersterClient) connect() (net.Conn, error) {
@@ -24,11 +25,13 @@ func createClient() PeersterClient {
 	UIPort := flag.String("UIPort", "8080", "port for the UI client (default '8080'")
 	msg := flag.String("msg", "Default message", "message to be sent")
 	dest := flag.String("dest", "", "destination for the private message")
+	file := flag.String("file", "", "file to share")
 	flag.Parse()
 	return PeersterClient{
 		UIPort: *UIPort,
 		msg:    *msg,
 		dest:   *dest,
+		file:   *file,
 	}
 }
 
