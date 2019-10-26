@@ -11,10 +11,11 @@ import (
 )
 
 type PeersterClient struct {
-	UIPort string
-	msg    string
-	dest   string
-	file   string
+	UIPort  string
+	msg     string
+	dest    string
+	file    string
+	request string
 }
 
 func (client PeersterClient) connect() (net.Conn, error) {
@@ -26,12 +27,14 @@ func createClient() PeersterClient {
 	msg := flag.String("msg", "Default message", "message to be sent")
 	dest := flag.String("dest", "", "destination for the private message")
 	file := flag.String("file", "", "file to share")
+	request := flag.String("request", "", "metafile hash of requested file")
 	flag.Parse()
 	return PeersterClient{
-		UIPort: *UIPort,
-		msg:    *msg,
-		dest:   *dest,
-		file:   *file,
+		UIPort:  *UIPort,
+		msg:     *msg,
+		dest:    *dest,
+		file:    *file,
+		request: *request,
 	}
 }
 
@@ -44,6 +47,7 @@ func main() {
 	msg := messaging.Message{
 		Text:        client.msg,
 		Destination: &client.dest,
+		File:        client.file,
 	}
 	encoded, err := protobuf.Encode(&msg)
 	if err != nil {

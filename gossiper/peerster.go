@@ -35,7 +35,8 @@ type Peerster struct {
 	Conn                    net.UDPConn
 	RTimer                  int
 	NextHopTable            map[string]string
-	SharedFiles             []SharedFile
+	SharedFiles             map[string]SharedFile
+	FileChunks              map[string][][]byte
 }
 
 func (peerster *Peerster) String() string {
@@ -72,7 +73,13 @@ func (peerster *Peerster) clientReceive(message messaging.Message) {
 			fmt.Printf("Error: could not send receivedPacket from client, reason: %s \n", err)
 		}
 	} else {
-		if message.Destination == nil || *message.Destination == "" {
+		if message.File != "" {
+			if message.Destination == nil {
+				peerster.shareFile(message.File)
+			} else {
+				peerster.requestFile(*message.Destination, []byte(message.File))
+			}
+		} else if message.Destination == nil || *message.Destination == "" {
 			peerster.sendNewRumorMessage(message.Text)
 		} else {
 			peerster.sendNewPrivateMessage(message)
@@ -118,7 +125,7 @@ func (peerster *Peerster) startRumormongeringSession(peer string, message messag
 			//fmt.Printf("TimeLeft: %v, Active: %v \n",peerster.RumormongeringSessions.GetSession(peer).TimeLeft, peerster.RumormongeringSessions.GetSession(peer).Active)
 			for peerster.RumormongeringSessions.GetSession(peer).TimeLeft > 0 && peerster.RumormongeringSessions.GetSession(peer).Active {
 				peerster.RumormongeringSessions.DecrementTimer(peer)
-				fmt.Printf("Timer decremented. %v\n", peerster.RumormongeringSessions.GetSession(peer))
+				//fmt.Printf("Timer decremented. %v\n", peerster.RumormongeringSessions.GetSession(peer))
 				time.Sleep(1000 * time.Millisecond) //TODO this is bad
 			}
 			//fmt.Printf("SESSION TIMEOUT, PEER: %s \n", peer)
@@ -216,19 +223,11 @@ func (peerster *Peerster) handleIncomingPrivateMessage(message *messaging.Privat
 		fmt.Printf("PRIVATE MESSAGE origin %s hop-limit %v contents %s \n", message.Origin, message.HopLimit, message.Text)
 		peerster.addToPrivateMessages(*message)
 	} else {
+		message.HopLimit--
 		if message.HopLimit == 0 {
 			return
 		}
-		nextHopAddr, ok := peerster.NextHopTable[message.Destination]
-		if ok {
-			message.HopLimit--
-			err := peerster.sendToPeer(nextHopAddr, messaging.GossipPacket{Private: message}, []string{})
-			if err != nil {
-				fmt.Printf("Unable to send private message to %s, reason: %s \n", nextHopAddr, err)
-			}
-		} else {
-			fmt.Printf("Couldn't find %s in next hop table \n", message.Destination)
-		}
+		peerster.nextHopRoute(&messaging.GossipPacket{Private: message}, message.Destination)
 	}
 }
 
@@ -356,6 +355,8 @@ func (peerster *Peerster) serverReceive(buffer []byte, originAddr net.UDPAddr) {
 		peerster.handleIncomingRumor(receivedPacket.Rumor, originAddr, false)
 		peerster.handleIncomingStatusPacket(receivedPacket.Status, originAddr)
 		peerster.handleIncomingPrivateMessage(receivedPacket.Private, originAddr)
+		peerster.handleIncomingDataReply(receivedPacket.DataReply, originAddr)
+		peerster.handleIncomingDataRequest(receivedPacket.DataRequest, originAddr)
 	} else {
 		//TODO Handle SimpleMessage and Rumor cases differently. If it's a simplemessage, the relay origin addr is probably inside the message
 
