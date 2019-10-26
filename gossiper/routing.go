@@ -12,10 +12,12 @@ func (peerster *Peerster) addToNextHopTable(id, originAddr string) {
 	peerster.NextHopTable = hopTable
 }
 
+// Sends
 func (peerster *Peerster) SendRouteMessage() {
 	peerster.sendNewRumorMessage("")
 }
 
+// Starts a goroutine that sends route messages periodically (for discovery)
 func (peerster *Peerster) SendRouteMessages() {
 	if peerster.RTimer == 0 {
 		return

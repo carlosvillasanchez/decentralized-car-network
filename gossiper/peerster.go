@@ -37,6 +37,7 @@ type Peerster struct {
 	NextHopTable            map[string]string
 	SharedFiles             map[string]SharedFile
 	FileChunks              map[string][][]byte
+	DownloadingFiles        DownloadingFiles
 }
 
 func (peerster *Peerster) String() string {
@@ -77,7 +78,7 @@ func (peerster *Peerster) clientReceive(message messaging.Message) {
 			if message.Destination == nil {
 				peerster.shareFile(message.File)
 			} else {
-				peerster.requestFile(*message.Destination, []byte(message.File))
+				peerster.sendDataRequest(*message.Destination, []byte(message.File))
 			}
 		} else if message.Destination == nil || *message.Destination == "" {
 			peerster.sendNewRumorMessage(message.Text)

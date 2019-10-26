@@ -51,8 +51,12 @@ func createPeerster() gossiper.Peerster {
 		Conn:                    net.UDPConn{},
 		RTimer:                  *rTimer,
 		NextHopTable:            map[string]string{},
-		SharedFiles:             []gossiper.SharedFile{},
+		SharedFiles:             map[string]gossiper.SharedFile{},
 		FileChunks:              map[string][][]byte{},
+		DownloadingFiles: gossiper.DownloadingFiles{
+			Map:   map[string]gossiper.FileBeingDownloaded{},
+			Mutex: sync.RWMutex{},
+		},
 	}
 }
 
