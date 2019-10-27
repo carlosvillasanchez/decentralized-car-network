@@ -36,7 +36,7 @@ type Peerster struct {
 	RTimer                  int
 	NextHopTable            map[string]string
 	SharedFiles             map[string]SharedFile
-	FileChunks              map[string][][]byte
+	FileChunks              map[string][]byte
 	DownloadingFiles        DownloadingFiles
 }
 
