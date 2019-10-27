@@ -74,8 +74,9 @@ func (peerster *Peerster) clientReceive(message messaging.Message) {
 			fmt.Printf("Error: could not send receivedPacket from client, reason: %s \n", err)
 		}
 	} else {
+		fmt.Println(message.File, message.Destination)
 		if message.File != "" {
-			if message.Destination == nil {
+			if *message.Destination == "" {
 				peerster.shareFile(message.File)
 			} else {
 				peerster.sendDataRequest(*message.Destination, []byte(message.File))

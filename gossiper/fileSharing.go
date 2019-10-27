@@ -8,6 +8,8 @@ import (
 	"time"
 )
 
+const HashSize = 32
+
 type FileBeingDownloaded struct {
 	MetafileHash   []byte
 	Metafile       []byte
@@ -45,6 +47,13 @@ func (d *DownloadingFiles) confirmReceivedDataReply(index string, reply messagin
 	d.Mutex.RLock()
 	defer d.Mutex.RUnlock()
 	d.Map[index].Channel <- reply
+}
+
+func (d *DownloadingFiles) isFullyDownloaded(index string) bool {
+	d.Mutex.RLock()
+	defer d.Mutex.RUnlock()
+	f := d.Map[index]
+	return f.CurrentChunk*HashSize > len(f.Metafile)
 }
 
 func (d *DownloadingFiles) incrementCurrentChunk(index string) {
@@ -124,7 +133,18 @@ func (peerster *Peerster) downloadData(peerIdentifier string, hash []byte) {
 		if !ok {
 			fmt.Printf("Warning: was unable to find the file download session when it should exist. Probably a bug")
 		}
-		peerster.downloadData(peerIdentifier, value.getHashToSend())
+		if peerster.DownloadingFiles.isFullyDownloaded(index) {
+			err := reconstructAndSaveFile(*value)
+			if err != nil {
+				fmt.Printf("Warning: Could not reconstruct/save file, reason: %s \n", err)
+			}
+			peerster.DownloadingFiles.deleteValue(index)
+		} else {
+			// At this point, we either request the same hash over again (because of timeout)
+			// or we request the next hash (because we incremented currentChunk,
+			// getHashToSend will return the next hash)
+			peerster.downloadData(peerIdentifier, value.getHashToSend())
+		}
 	}()
 }
 
@@ -146,7 +166,8 @@ func (peerster *Peerster) handleIncomingDataReply(reply *messaging.DataReply, or
 	} else {
 		fileBeingDownloaded.DownloadedData = append(fileBeingDownloaded.DownloadedData, reply.Data...)
 	}
-	// We send a message through the session's channel to trigger the session deleting itself and starting a new one
+	// We send a message through the session's channel to trigger starting a new one with the next request
+	// or if its finished, reconstruct/save the file
 	peerster.DownloadingFiles.confirmReceivedDataReply(index, *reply)
 }
 

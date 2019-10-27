@@ -48,6 +48,7 @@ func main() {
 		Text:        client.msg,
 		Destination: &client.dest,
 		File:        client.file,
+		Request:     []byte(client.request),
 	}
 	encoded, err := protobuf.Encode(&msg)
 	if err != nil {

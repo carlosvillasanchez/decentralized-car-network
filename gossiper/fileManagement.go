@@ -2,6 +2,7 @@ package gossiper
 
 import (
 	"crypto"
+	"encoding/hex"
 	"fmt"
 	"io/ioutil"
 )
@@ -15,7 +16,7 @@ func readSharedFile(fileName string) ([]byte, error) {
 }
 
 // Divides a file into chunks of size ChunkSize (last chunk will have a dynamic size)
-func chunkFile(file []byte) (chunks [][]byte) {
+func chunkFile(file []byte) (chunks [][]byte, chunkHashes [][]byte) {
 	for i := 0; i <= len(file)/ChunkSize; i++ {
 		upperBound := (i + 1) * ChunkSize
 		if (i+1)*ChunkSize > len(file) {
@@ -23,6 +24,9 @@ func chunkFile(file []byte) (chunks [][]byte) {
 		}
 		chunk := file[i*ChunkSize : upperBound]
 		chunks = append(chunks, chunk)
+		sha256 := crypto.SHA256.New()
+		sha256.Write(chunks[i])
+		chunkHashes = append(chunkHashes, sha256.Sum(nil))
 	}
 	return
 }
@@ -41,8 +45,9 @@ func computeMetafile(chunks [][]byte) (metafile []byte, metafileHash []byte) {
 }
 
 // Will reconstruct a file from a set of chunks, and save it in _Downloads
-func reconstructAndSaveFile(chunks [][]byte) error {
-	return nil
+func reconstructAndSaveFile(downloaded FileBeingDownloaded) error {
+	data := append([]byte{}, downloaded.DownloadedData...)
+	return ioutil.WriteFile("_Downloads/Test", data, 0644)
 }
 
 // A struct that contains all the metadata for a specific file
@@ -65,7 +70,7 @@ func (peerster *Peerster) shareFile(fileName string) {
 
 // Adds a read file to the peerster's internal data structure (chunks it and computes metafile/hash as well)
 func (peerster *Peerster) indexReadFile(file []byte, fileName string) {
-	chunks := chunkFile(file)
+	chunks, chunkHashes := chunkFile(file)
 	metafile, metafileHash := computeMetafile(chunks)
 	sharedFile := SharedFile{
 		Metafile:     metafile,
@@ -73,6 +78,9 @@ func (peerster *Peerster) indexReadFile(file []byte, fileName string) {
 		FileSize:     0,
 		FileName:     fileName,
 	}
+	fmt.Printf("MetafileHash: %s, ChunkLength: %v \n", string(hex.EncodeToString(metafileHash)), len(chunks))
 	peerster.SharedFiles[string(metafileHash)] = sharedFile
-	peerster.FileChunks[string(metafileHash)] = chunks
+	for i := range chunkHashes {
+		peerster.FileChunks[string(chunkHashes[i])] = chunks[i]
+	}
 }

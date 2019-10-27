@@ -36,7 +36,7 @@ type RumorMessage struct {
 type Message struct {
 	Text        string
 	Destination *string
-	Request     *[]byte
+	Request     string
 	File        string
 }
 
