@@ -22,11 +22,17 @@ func (f *FileBeingDownloaded) getHashToSend() []byte {
 	if f.Metafile == nil {
 		return f.MetafileHash
 	}
-	upperBound := (f.CurrentChunk + 1) * ChunkSize
-	if (f.CurrentChunk+1)*ChunkSize > len(f.Metafile) {
+	upperBound := (f.CurrentChunk + 1) * HashSize
+	if (f.CurrentChunk+1)*HashSize > len(f.Metafile) {
 		upperBound = len(f.Metafile)
 	}
-	return f.Metafile[f.CurrentChunk*ChunkSize : upperBound]
+	lowerBound := f.CurrentChunk * HashSize
+	if lowerBound > upperBound {
+		lowerBound = 0
+	}
+	fmt.Println((f.CurrentChunk + 1) * HashSize)
+	fmt.Printf("THE HASH TO SEND IS: %v lowerb: %v higherb: %v, len: %v, \n", string(f.Metafile[lowerBound:upperBound]), lowerBound, upperBound, len(f.Metafile))
+	return f.Metafile[lowerBound:upperBound]
 }
 
 type DownloadingFiles struct {
@@ -53,7 +59,9 @@ func (d *DownloadingFiles) isFullyDownloaded(index string) bool {
 	d.Mutex.RLock()
 	defer d.Mutex.RUnlock()
 	f := d.Map[index]
-	return f.CurrentChunk*HashSize > len(f.Metafile)
+	fmt.Println("Verify: ", f.CurrentChunk*HashSize, len(f.Metafile))
+	fmt.Println(f.DownloadedData, "THIS IS OUR CURRENT DATA")
+	return f.CurrentChunk*HashSize >= len(f.Metafile)
 }
 
 func (d *DownloadingFiles) incrementCurrentChunk(index string) {
@@ -64,14 +72,15 @@ func (d *DownloadingFiles) incrementCurrentChunk(index string) {
 	d.Map[index] = f
 }
 
-func (d *DownloadingFiles) getValue(index string) (*FileBeingDownloaded, bool) {
+func (d *DownloadingFiles) getValue(index string) (FileBeingDownloaded, bool) {
 	d.Mutex.RLock()
 	defer d.Mutex.RUnlock()
 	file, ok := d.Map[index]
-	return &file, ok
+	return file, ok
 }
 
 func (d *DownloadingFiles) setValue(index string, value FileBeingDownloaded) {
+	fmt.Println("Setting value", index, value.MetafileHash)
 	d.Mutex.Lock()
 	defer d.Mutex.Unlock()
 	d.Map[index] = value
@@ -95,46 +104,53 @@ func (peerster *Peerster) sendDataRequest(destination string, hash []byte) {
 }
 
 // Starts a download of a specific chunk (or a metafile)
-func (peerster *Peerster) downloadData(peerIdentifier string, hash []byte) {
+func (peerster *Peerster) downloadData(peerIdentifier string, hash []byte, oldSession *FileBeingDownloaded) {
 	index := string(hash)
-	_, ok := peerster.DownloadingFiles.getValue(index)
-	if !ok {
+	fmt.Println("HASH THING: ", hash)
+	if oldSession == nil {
 		peerster.DownloadingFiles.setValue(index, FileBeingDownloaded{
 			MetafileHash: hash,
 			Channel:      make(chan messaging.DataReply),
 			CurrentChunk: 0,
 			Metafile:     nil,
 		})
+	} else {
+		peerster.DownloadingFiles.setValue(index, *oldSession)
 	}
 	peerster.sendDataRequest(peerIdentifier, hash)
 	go func() {
 		value, ok := peerster.DownloadingFiles.getValue(index)
+		fmt.Println("0 : ", len(value.MetafileHash), ok)
 		if !ok {
 			return
 		}
 		select {
 		case reply := <-value.Channel:
 			fileBeingDownloaded, ok := peerster.DownloadingFiles.getValue(index)
+			fmt.Println("1: ", len(value.MetafileHash), ok, index)
 			if !ok {
 				// We aren't downloading this file, so why did we receive it? Who knows..
 				// TODO is that a possible case? ??? ??? ????
 				return
 			}
 			if fileBeingDownloaded.Metafile == nil {
+				fmt.Println("2: metafile nil", reply.Data)
 				fileBeingDownloaded.Metafile = reply.Data
 			} else {
+				fmt.Println("3: we got data", reply.Data)
 				fileBeingDownloaded.DownloadedData = append(fileBeingDownloaded.DownloadedData, reply.Data...)
+				fileBeingDownloaded.CurrentChunk++
 			}
-			peerster.DownloadingFiles.setValue(index, *fileBeingDownloaded)
-			peerster.DownloadingFiles.incrementCurrentChunk(index)
+			peerster.DownloadingFiles.setValue(index, fileBeingDownloaded)
 		case <-time.After(5 * time.Second):
+			fmt.Printf("DownloadingFiles session timeout with hash %v \n", hash)
 		}
 		value, ok = peerster.DownloadingFiles.getValue(index)
 		if !ok {
 			fmt.Printf("Warning: was unable to find the file download session when it should exist. Probably a bug")
 		}
 		if peerster.DownloadingFiles.isFullyDownloaded(index) {
-			err := reconstructAndSaveFile(*value)
+			err := reconstructAndSaveFile(value)
 			if err != nil {
 				fmt.Printf("Warning: Could not reconstruct/save file, reason: %s \n", err)
 			}
@@ -143,7 +159,7 @@ func (peerster *Peerster) downloadData(peerIdentifier string, hash []byte) {
 			// At this point, we either request the same hash over again (because of timeout)
 			// or we request the next hash (because we incremented currentChunk,
 			// getHashToSend will return the next hash)
-			peerster.downloadData(peerIdentifier, value.getHashToSend())
+			peerster.downloadData(peerIdentifier, value.getHashToSend(), &value)
 		}
 	}()
 }
@@ -153,38 +169,49 @@ func (peerster *Peerster) startFileUpload(metafileHash []byte) {
 }
 
 func (peerster *Peerster) handleIncomingDataReply(reply *messaging.DataReply, originAddr net.UDPAddr) {
-	// TODO We need to check if the thing doesnt have a metafile, if it doesnt then it was a metafile request
-	index := string(reply.HashValue)
-	fileBeingDownloaded, ok := peerster.DownloadingFiles.getValue(index)
-	if !ok {
-		// We aren't downloading this file, so why did we receive it? Who knows..
-		// TODO is that a possible case? ??? ??? ????
+	if reply == nil {
 		return
 	}
-	if fileBeingDownloaded.Metafile == nil {
-		fileBeingDownloaded.Metafile = reply.Data
+	fmt.Println("Reply for file has come. Values:", reply.Data, originAddr.String(), reply.Origin)
+	// TODO We need to check if the thing doesnt have a metafile, if it doesnt then it was a metafile request
+	if reply.Destination == peerster.Name {
+		index := string(reply.HashValue)
+		// We send a message through the session's channel to trigger starting a new one with the next request
+		// or if its finished, reconstruct/save the file
+		peerster.DownloadingFiles.confirmReceivedDataReply(index, *reply)
+	} else if reply.HopLimit == 0 {
+		return
 	} else {
-		fileBeingDownloaded.DownloadedData = append(fileBeingDownloaded.DownloadedData, reply.Data...)
+		reply.HopLimit--
+		peerster.nextHopRoute(&messaging.GossipPacket{DataReply: reply}, reply.Destination)
 	}
-	// We send a message through the session's channel to trigger starting a new one with the next request
-	// or if its finished, reconstruct/save the file
-	peerster.DownloadingFiles.confirmReceivedDataReply(index, *reply)
 }
 
 func (peerster *Peerster) handleIncomingDataRequest(request *messaging.DataRequest, originAddr net.UDPAddr) {
+	if request == nil {
+		return
+	}
+	fmt.Println("Request for file has come. Values:", request.Destination, request.HashValue, originAddr.String(), request.Origin)
+
 	if request.Destination == peerster.Name {
 		//TODO we see if we have the file, and then send it back
 		var data []byte
 		file, ok := peerster.SharedFiles[string(request.HashValue)]
 		if !ok {
 			//TODO Its not a file, so must be a chunk
-			chunk, _ := peerster.FileChunks[string(request.HashValue)]
+			chunk, ok := peerster.FileChunks[string(request.HashValue)]
+			if !ok {
+				fmt.Println("Warning: A file request requested a chunk we don't have.", request.HashValue)
+			}
+			fmt.Println("He wants chunk.")
 			// Chunk can be nil here - which means we don't have the chunk, so sending back a nil value is correct
 			data = chunk
 		} else {
 			// This means the request was for a metafile we have
+			fmt.Println("He wants metafile.", file.Metafile)
 			data = file.Metafile
 		}
+		fmt.Println("The data is: ", data)
 		reply := &messaging.DataReply{
 			Origin:      peerster.Name,
 			Destination: request.Origin,

@@ -7,8 +7,10 @@ import (
 	"strings"
 )
 
+const MaxBufferSize = 65536
+
 func ReadFromConnection(conn net.UDPConn) ([]byte, *net.UDPAddr, error) {
-	buffer := make([]byte, 1024)
+	buffer := make([]byte, MaxBufferSize)
 	n, originAddr, err := conn.ReadFromUDP(buffer)
 	if err != nil {
 		return nil, nil, err

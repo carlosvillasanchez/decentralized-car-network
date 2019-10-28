@@ -1,6 +1,7 @@
 package gossiper
 
 import (
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"github.com/dedis/protobuf"
@@ -76,12 +77,18 @@ func (peerster *Peerster) clientReceive(message messaging.Message) {
 	} else {
 		fmt.Println(message.File, message.Destination)
 		if message.File != "" {
-			if *message.Destination == "" {
-				peerster.shareFile(message.File)
-			} else {
-				peerster.sendDataRequest(*message.Destination, []byte(message.File))
+			peerster.shareFile(message.File)
+		} else if message.Request != "" && message.Destination != nil {
+			// We decode the hexadecimal metafile request
+			dst := make([]byte, hex.DecodedLen(len([]byte(message.Request))))
+			_, err := hex.Decode(dst, []byte(message.Request))
+			if err != nil {
+				fmt.Printf("Warning: Invalid input %s from client when requesting file \n", message.Request)
+				return
 			}
-		} else if message.Destination == nil || *message.Destination == "" {
+			fmt.Println("DST: ", dst)
+			peerster.downloadData(*message.Destination, dst, nil)
+		} else if message.Destination == nil {
 			peerster.sendNewRumorMessage(message.Text)
 		} else {
 			peerster.sendNewPrivateMessage(message)

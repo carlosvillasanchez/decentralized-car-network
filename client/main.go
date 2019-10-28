@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/hex"
 	"flag"
 	"fmt"
 	"github.com/dedis/protobuf"
@@ -39,6 +40,8 @@ func createClient() PeersterClient {
 }
 
 func main() {
+	val, err := hex.DecodeString("977132b205d9b89b4193d511455e846c9b03135c9ade14d763c1b7394e57ad42")
+	fmt.Println(val, "????")
 	client := createClient()
 	conn, err := client.connect()
 	if err != nil {
@@ -48,7 +51,7 @@ func main() {
 		Text:        client.msg,
 		Destination: &client.dest,
 		File:        client.file,
-		Request:     []byte(client.request),
+		Request:     client.request,
 	}
 	encoded, err := protobuf.Encode(&msg)
 	if err != nil {

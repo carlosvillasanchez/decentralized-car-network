@@ -78,9 +78,10 @@ func (peerster *Peerster) indexReadFile(file []byte, fileName string) {
 		FileSize:     0,
 		FileName:     fileName,
 	}
-	fmt.Printf("MetafileHash: %s, ChunkLength: %v \n", string(hex.EncodeToString(metafileHash)), len(chunks))
+	fmt.Printf("MetafileHash: %s, ChunkLength: %v \n", hex.EncodeToString(metafileHash), len(chunks))
 	peerster.SharedFiles[string(metafileHash)] = sharedFile
 	for i := range chunkHashes {
+		fmt.Println(i, chunkHashes[i])
 		peerster.FileChunks[string(chunkHashes[i])] = chunks[i]
 	}
 }
