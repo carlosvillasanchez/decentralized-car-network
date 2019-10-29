@@ -76,9 +76,9 @@ func (peerster *Peerster) clientReceive(message messaging.Message) {
 		}
 	} else {
 		fmt.Println(message.File, message.Destination)
-		if message.File != "" {
+		if message.File != "" && message.Request == "" {
 			peerster.shareFile(message.File)
-		} else if message.Request != "" && message.Destination != nil {
+		} else if message.Request != "" && message.File != "" && message.Destination != nil {
 			// We decode the hexadecimal metafile request
 			dst := make([]byte, hex.DecodedLen(len([]byte(message.Request))))
 			_, err := hex.Decode(dst, []byte(message.Request))
@@ -87,8 +87,16 @@ func (peerster *Peerster) clientReceive(message messaging.Message) {
 				return
 			}
 			fmt.Println("DST: ", dst)
-			peerster.downloadData(*message.Destination, dst, nil)
-		} else if message.Destination == nil {
+			file := FileBeingDownloaded{
+				MetafileHash:   dst,
+				Channel:        make(chan messaging.DataReply),
+				CurrentChunk:   0,
+				Metafile:       nil,
+				DownloadedData: nil,
+				FileName:       message.File,
+			}
+			peerster.downloadData(*message.Destination, file)
+		} else if message.Destination == nil || *message.Destination == "" {
 			peerster.sendNewRumorMessage(message.Text)
 		} else {
 			peerster.sendNewPrivateMessage(message)
@@ -117,8 +125,8 @@ func (peerster *Peerster) sendNewPrivateMessage(msg messaging.Message) {
 	peerster.handleIncomingPrivateMessage(&private, messaging.StringAddrToUDPAddr(peerster.GossipAddress))
 }
 func (peerster *Peerster) startRumormongeringSession(peer string, message messaging.RumorMessage) error {
-	session := peerster.RumormongeringSessions.GetSession(peer)
-	if session == (messaging.RumormongeringSession{}) {
+	session, ok := peerster.RumormongeringSessions.GetSession(peer)
+	if !ok || session == (messaging.RumormongeringSession{}) {
 		session = messaging.RumormongeringSession{
 			Message:  message,
 			TimeLeft: 10,
@@ -132,14 +140,14 @@ func (peerster *Peerster) startRumormongeringSession(peer string, message messag
 	if peerster.RumormongeringSessions.ActivateSession(peer) {
 		go func() {
 			//fmt.Printf("TimeLeft: %v, Active: %v \n",peerster.RumormongeringSessions.GetSession(peer).TimeLeft, peerster.RumormongeringSessions.GetSession(peer).Active)
-			for peerster.RumormongeringSessions.GetSession(peer).TimeLeft > 0 && peerster.RumormongeringSessions.GetSession(peer).Active {
+			for session, _ := peerster.RumormongeringSessions.GetSession(peer); session.TimeLeft > 0 && session.Active; {
 				peerster.RumormongeringSessions.DecrementTimer(peer)
 				//fmt.Printf("Timer decremented. %v\n", peerster.RumormongeringSessions.GetSession(peer))
 				time.Sleep(1000 * time.Millisecond) //TODO this is bad
 			}
 			//fmt.Printf("SESSION TIMEOUT, PEER: %s \n", peer)
-			session := peerster.RumormongeringSessions.GetSession(peer)
-			if session.Active {
+			session, ok := peerster.RumormongeringSessions.GetSession(peer)
+			if ok && session.Active {
 				peerster.handleIncomingRumor(&session.Message, messaging.StringAddrToUDPAddr(peerster.GossipAddress), false) // we rerun
 			}
 			peerster.RumormongeringSessions.DeactivateSession(peer)
@@ -158,6 +166,9 @@ func (peerster *Peerster) stopRumormongeringSession(peer string) {
 // Handles an incoming rumor message. A zero-value originAddr means the message came from a client.
 func (peerster *Peerster) handleIncomingRumor(rumor *messaging.RumorMessage, originAddr net.UDPAddr, coinflip bool) string {
 	if rumor == nil {
+		return ""
+	}
+	if *rumor == (messaging.RumorMessage{}) {
 		return ""
 	}
 	fmt.Printf("RUMOR origin %s from %s ID %v contents %s \n", rumor.Origin, originAddr.String(), rumor.ID, rumor.Text)
@@ -308,7 +319,6 @@ func (peerster *Peerster) handleIncomingStatusPacket(packet *messaging.StatusPac
 			shouldSendStatusPacket = true
 		}
 	}
-
 	if shouldSendStatusPacket {
 		err := peerster.sendToPeer(originAddr.String(), gossipPacket, []string{})
 		if err != nil {
@@ -319,8 +329,8 @@ func (peerster *Peerster) handleIncomingStatusPacket(packet *messaging.StatusPac
 
 	fmt.Printf("IN SYNC WITH %s \n", originAddr.String())
 
-	session := peerster.RumormongeringSessions.GetSession(originAddr.String())
-	if session.Active && peerster.considerRumormongering() {
+	session, ok := peerster.RumormongeringSessions.GetSession(originAddr.String())
+	if ok && session.Active && peerster.considerRumormongering() {
 		targetAddr := peerster.handleIncomingRumor(&session.Message, messaging.StringAddrToUDPAddr(peerster.GossipAddress), true)
 		fmt.Printf("FLIPPED COIN sending rumor to %s \n", targetAddr)
 	}
@@ -555,7 +565,7 @@ func (peerster Peerster) sendToPeer(peer string, packet messaging.GossipPacket, 
 		return err
 	}
 	n, err := peerster.Conn.WriteToUDP(packetBytes, &peerAddr)
-	fmt.Printf("Amount of bytes written: %s | written to: %s \n", n, peerAddr.String())
+	fmt.Printf("Amount of bytes written: %v | written to: %s \n", n, peerAddr.String())
 	if err != nil {
 		return err
 	}

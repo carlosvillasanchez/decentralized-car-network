@@ -32,7 +32,6 @@ func createPeerster() gossiper.Peerster {
 	if *peers != "" {
 		peersList = strings.Split(*peers, ",")
 	}
-	fmt.Println(peersList, *peers, "???")
 	return gossiper.Peerster{
 		UIPort:           *UIPort,
 		GossipAddress:    *gossipAddr,
@@ -71,7 +70,6 @@ func main() {
 	go peerster.Listen(gossiper.Server)
 	go peerster.ListenFrontend()
 	peerster.AntiEntropy()
-	peerster.SendRouteMessage()
 	peerster.SendRouteMessages()
 	peerster.Listen(gossiper.Client)
 }

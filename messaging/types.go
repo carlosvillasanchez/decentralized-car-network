@@ -94,17 +94,17 @@ type AtomicRumormongeringSessionMap struct {
 	Mutex                  sync.RWMutex
 }
 
-func (a *AtomicRumormongeringSessionMap) GetSession(index string) (session RumormongeringSession) {
+func (a *AtomicRumormongeringSessionMap) GetSession(index string) (session RumormongeringSession, ok bool) {
 	a.Mutex.RLock()
-	session = a.RumormongeringSessions[index]
-	a.Mutex.RUnlock()
+	defer a.Mutex.RUnlock()
+	session, ok = a.RumormongeringSessions[index]
 	return
 }
 
 func (a *AtomicRumormongeringSessionMap) SetSession(index string, value RumormongeringSession) {
 	a.Mutex.Lock()
+	defer a.Mutex.Unlock()
 	a.RumormongeringSessions[index] = value
-	a.Mutex.Unlock()
 }
 
 // Sets the active value of a session to True if it's not already active.
@@ -112,38 +112,50 @@ func (a *AtomicRumormongeringSessionMap) SetSession(index string, value Rumormon
 // This method needs to be thread safe since it will start a goroutine that should only run once
 func (a *AtomicRumormongeringSessionMap) ActivateSession(index string) bool {
 	a.Mutex.Lock()
-	session := a.RumormongeringSessions[index]
+	defer a.Mutex.Unlock()
+	session, ok := a.RumormongeringSessions[index]
+	if !ok {
+		return false
+	}
 	if !session.Active {
 		session.SetActive(true)
 		session.ResetTimer()
 		a.RumormongeringSessions[index] = session
-		a.Mutex.Unlock()
 		return true
 	}
-	a.Mutex.Unlock()
 	return false
 }
 
 func (a *AtomicRumormongeringSessionMap) DecrementTimer(index string) {
 	a.Mutex.Lock()
-	session := a.RumormongeringSessions[index]
+	defer a.Mutex.Unlock()
+	session, ok := a.RumormongeringSessions[index]
+	if !ok {
+		return
+	}
 	session.DecrementTimer()
 	a.RumormongeringSessions[index] = session
-	a.Mutex.Unlock()
 }
 
 func (a *AtomicRumormongeringSessionMap) DeactivateSession(index string) {
 	a.Mutex.Lock()
-	session := a.RumormongeringSessions[index]
+	defer a.Mutex.Unlock()
+	session, ok := a.RumormongeringSessions[index]
+	if !ok {
+		return
+	}
 	session.SetActive(false)
 	a.RumormongeringSessions[index] = session
-	a.Mutex.Unlock()
 }
 
 func (a *AtomicRumormongeringSessionMap) ResetTimer(index string) {
 	a.Mutex.Lock()
-	session := a.RumormongeringSessions[index]
+	defer a.Mutex.Unlock()
+	session, ok := a.RumormongeringSessions[index]
+	if !ok {
+		return
+	}
 	session.ResetTimer()
 	a.RumormongeringSessions[index] = session
-	a.Mutex.Unlock()
+
 }
