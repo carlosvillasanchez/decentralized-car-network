@@ -70,14 +70,13 @@ func (peerster *Peerster) shareFile(fileName string) {
 }
 
 // Adds a read file to the peerster's internal data structure (chunks it and computes metafile/hash as well)
-func (peerster *Peerster) indexReadFile(file []byte, fileName string) {
+func (peerster *Peerster) indexReadFile(file []byte, fileName string) { //TODO remove fileName arg
 	chunks, chunkHashes := chunkFile(file)
 	metafile, metafileHash := computeMetafile(chunks)
 	sharedFile := SharedFile{
 		Metafile:     metafile,
 		MetafileHash: metafileHash,
-		FileSize:     0,
-		FileName:     fileName,
+		FileSize:     0, // TODO filesize unnecessary? why did i add this
 	}
 	fmt.Printf("MetafileHash: %s, ChunkLength: %v \n", hex.EncodeToString(metafileHash), len(chunks)) // RemoveTag
 	peerster.SharedFiles[string(metafileHash)] = sharedFile
@@ -85,4 +84,15 @@ func (peerster *Peerster) indexReadFile(file []byte, fileName string) {
 		fmt.Println(i, chunkHashes[i])
 		peerster.FileChunks[string(chunkHashes[i])] = chunks[i]
 	}
+}
+
+func (peerster *Peerster) indexReconstructedFile(file FileBeingDownloaded) {
+	sharedFile := SharedFile{
+		Metafile:     file.Metafile,
+		MetafileHash: file.MetafileHash,
+		FileSize:     0,
+	}
+	fmt.Printf("Index reconstructed %v, %s", file.MetafileHash, file.Metafile)
+	peerster.SharedFiles[string(file.MetafileHash)] = sharedFile // TODO needs to be mutex
+	// if this is not mutex when youre reviewing i will buy you a beer
 }

@@ -105,33 +105,32 @@ func (peerster *Peerster) sendDataRequest(destination string, hash []byte) {
 func (peerster *Peerster) downloadData(peerIdentifier string, previousDownloadSession FileBeingDownloaded) {
 	hash := previousDownloadSession.getHashToSend()
 	index := string(hash)
-	fmt.Println("HASH THING: ", hash) // RemoveTag
 	peerster.DownloadingFiles.setValue(index, previousDownloadSession)
 	peerster.sendDataRequest(peerIdentifier, hash)
 	go func() {
 		value, ok := peerster.DownloadingFiles.getValue(index)
-		fmt.Println("0 : ", len(value.MetafileHash), ok) // RemoveTag
 		if !ok {
 			return
 		}
 		select {
 		case reply := <-value.Channel:
 			fileBeingDownloaded, ok := peerster.DownloadingFiles.getValue(index)
-			fmt.Println("1: ", len(value.MetafileHash), ok, index) // RemoveTag
 			if !ok {
 				// We aren't downloading this file, so why did we receive it? Who knows..
 				// TODO is that a possible case? ??? ??? ????
 				return
 			}
 			if fileBeingDownloaded.Metafile == nil {
-				fmt.Println("2: metafile nil", reply.Data) // RemoveTag
 				fileBeingDownloaded.Metafile = reply.Data
 			} else {
-				fmt.Println("3: we got data", reply.Data) // RemoveTag
+				// TODO verify that data is correct
 				fileBeingDownloaded.DownloadedData = append(fileBeingDownloaded.DownloadedData, reply.Data...)
 				fileBeingDownloaded.CurrentChunk++
+				peerster.FileChunks[string(reply.HashValue)] = reply.Data //TODO make mutex!!!!! THREAD SAFETY!!!!
+				// if youre reviewing this and this isnt thread safe i will buy you a beer
 			}
 			peerster.DownloadingFiles.setValue(index, fileBeingDownloaded)
+
 		case <-time.After(5 * time.Second):
 			fmt.Printf("DownloadingFiles session timeout with hash %v \n", hash)
 		}
@@ -143,6 +142,8 @@ func (peerster *Peerster) downloadData(peerIdentifier string, previousDownloadSe
 			err := reconstructAndSaveFile(value)
 			if err != nil {
 				fmt.Printf("Warning: Could not reconstruct/save file, reason: %s \n", err)
+			} else {
+				peerster.indexReconstructedFile(value)
 			}
 			peerster.DownloadingFiles.deleteValue(index)
 		} else {

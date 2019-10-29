@@ -7,6 +7,11 @@ import (
 )
 
 func (peerster *Peerster) addToNextHopTable(id, originAddr string) {
+	_, exists := peerster.NextHopTable[id]
+	if exists {
+		fmt.Println("Tried to add peer that already exists in dhsv: ", id, originAddr)
+		return
+	}
 	hopTable := peerster.NextHopTable
 	hopTable[id] = originAddr
 	peerster.NextHopTable = hopTable

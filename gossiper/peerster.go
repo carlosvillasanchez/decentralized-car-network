@@ -66,7 +66,11 @@ func (peerster *Peerster) createConnection(origin Origin) (net.UDPConn, error) {
 }
 
 func (peerster *Peerster) clientReceive(message messaging.Message) {
-	fmt.Println("CLIENT MESSAGE " + message.Text)
+	destinationString := ""
+	if message.Destination != nil {
+		destinationString = "dest " + *message.Destination
+	}
+	fmt.Println("CLIENT MESSAGE " + message.Text + destinationString)
 
 	if peerster.Simple {
 		packet := messaging.GossipPacket{Simple: peerster.createSimpleMessage(message.Text)}
