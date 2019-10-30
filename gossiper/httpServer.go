@@ -59,8 +59,8 @@ func (peerster *Peerster) sendMessages(w http.ResponseWriter, req *http.Request)
 	allMessages := struct {
 		PrivateMessages map[string][]messaging.PrivateMessage
 		RumorMessages   map[string][]messaging.RumorMessage
-	}{PrivateMessages: peerster.ReceivedPrivateMessages,
-		RumorMessages: peerster.ReceivedMessages}
+	}{PrivateMessages: peerster.ReceivedPrivateMessages.Map,
+		RumorMessages: peerster.ReceivedMessages.Map}
 	sendValueAsJson(w, req, allMessages)
 }
 

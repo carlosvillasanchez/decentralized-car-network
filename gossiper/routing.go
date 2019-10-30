@@ -7,7 +7,9 @@ import (
 )
 
 func (peerster *Peerster) addToNextHopTable(rumor messaging.RumorMessage, originAddr string) {
-	peerster.NextHopTable[rumor.Origin] = originAddr
+	peerster.NextHopTable.Mutex.Lock()
+	defer peerster.NextHopTable.Mutex.Unlock()
+	peerster.NextHopTable.Map[rumor.Origin] = originAddr
 }
 
 // Sends
@@ -32,11 +34,13 @@ func (peerster *Peerster) SendRouteMessages() {
 
 // Sends a packet using the next hop table to find the path to the recipient.
 func (peerster *Peerster) nextHopRoute(packet *messaging.GossipPacket, destination string) {
-	nextHopAddr, ok := peerster.NextHopTable[destination]
+	peerster.NextHopTable.Mutex.RLock()
+	nextHopAddr, ok := peerster.NextHopTable.Map[destination]
 	fmt.Println(nextHopAddr, destination, "THIS IS IT BOIS")
-	for i := range peerster.NextHopTable {
-		fmt.Println(i, peerster.NextHopTable[i], destination)
+	for i := range peerster.NextHopTable.Map {
+		fmt.Println(i, peerster.NextHopTable.Map[i], destination)
 	}
+	peerster.NextHopTable.Mutex.RUnlock()
 	if ok {
 		err := peerster.sendToPeer(nextHopAddr, *packet, []string{})
 		if err != nil {

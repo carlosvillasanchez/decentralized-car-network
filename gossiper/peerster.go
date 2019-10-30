@@ -22,23 +22,38 @@ const (
 )
 
 type Peerster struct {
-	UIPort                  string
-	GossipAddress           string
-	KnownPeers              []string
-	Name                    string
-	Simple                  bool
-	AntiEntropyTimer        int
-	Want                    []messaging.PeerStatus
-	MsgSeqNumber            uint32
-	ReceivedMessages        map[string][]messaging.RumorMessage
-	ReceivedPrivateMessages map[string][]messaging.PrivateMessage
-	RumormongeringSessions  messaging.AtomicRumormongeringSessionMap
-	Conn                    net.UDPConn
-	RTimer                  int
-	NextHopTable            map[string]string
-	SharedFiles             map[string]SharedFile
-	FileChunks              map[string][]byte
-	DownloadingFiles        DownloadingFiles
+	UIPort           string
+	GossipAddress    string
+	KnownPeers       []string
+	Name             string
+	Simple           bool
+	AntiEntropyTimer int
+	Want             []messaging.PeerStatus
+	MsgSeqNumber     uint32
+	ReceivedMessages struct {
+		Map   map[string][]messaging.RumorMessage
+		Mutex sync.RWMutex
+	}
+	ReceivedPrivateMessages struct {
+		Map   map[string][]messaging.PrivateMessage
+		Mutex sync.RWMutex
+	}
+	RumormongeringSessions messaging.AtomicRumormongeringSessionMap
+	Conn                   net.UDPConn
+	RTimer                 int
+	NextHopTable           struct {
+		Map   map[string]string
+		Mutex sync.RWMutex
+	}
+	SharedFiles struct {
+		Map   map[string]SharedFile
+		Mutex sync.RWMutex
+	}
+	FileChunks struct {
+		Map   map[string][]byte
+		Mutex sync.RWMutex
+	}
+	DownloadingFiles DownloadingFiles
 }
 
 func (peerster *Peerster) String() string {
@@ -229,7 +244,7 @@ func (peerster *Peerster) getMissingMessages(theirNextId, myNextId uint32, origi
 	//fmt.Printf("TheirNext: %v, myNext: %v, origin: %q", theirNextId, myNextId, origin)
 	for i := theirNextId - 1; i < myNextId-1; i++ {
 		//fmt.Println("i: ", i)
-		messages = append(messages, peerster.ReceivedMessages[origin][i])
+		messages = append(messages, peerster.ReceivedMessages.Map[origin][i])
 	}
 	return
 }
@@ -286,8 +301,10 @@ func (peerster *Peerster) handleIncomingStatusPacket(packet *messaging.StatusPac
 		if !found {
 			// Other peer doesn't even know about one of the peers in our want, so we just send him this peer's first message here
 			//fmt.Printf("Other peer doesn't know about a peer. Sending first message. \n")
-			if len(peerster.ReceivedMessages[identifier]) >= 1 {
-				firstMessage := peerster.ReceivedMessages[identifier][0]
+			peerster.ReceivedMessages.Mutex.RLock()
+			if len(peerster.ReceivedMessages.Map[identifier]) >= 1 {
+				firstMessage := peerster.ReceivedMessages.Map[identifier][0]
+				peerster.ReceivedMessages.Mutex.RUnlock()
 				err := peerster.sendToPeer(originAddr.String(), messaging.GossipPacket{
 					Rumor: &firstMessage,
 				}, []string{})
@@ -296,6 +313,7 @@ func (peerster *Peerster) handleIncomingStatusPacket(packet *messaging.StatusPac
 				}
 				return
 			}
+			peerster.ReceivedMessages.Mutex.RUnlock()
 		}
 	}
 	statusPacket := messaging.StatusPacket{Want: peerster.Want}
@@ -404,8 +422,10 @@ func (peerster Peerster) printMessages() {
 		fmt.Println(peerster.Want[i])
 	}
 	fmt.Println("PRINTING RECEIVED MSGS")
-	for i := range peerster.ReceivedMessages {
-		peer := peerster.ReceivedMessages[i]
+	peerster.ReceivedMessages.Mutex.RLock()
+	defer peerster.ReceivedMessages.Mutex.RUnlock()
+	for i := range peerster.ReceivedMessages.Map {
+		peer := peerster.ReceivedMessages.Map[i]
 		fmt.Println()
 		for j := range peer {
 			fmt.Println(peer[j])
@@ -449,26 +469,30 @@ func (peerster *Peerster) registerNewPeer(address, peerIdentifier string, initia
 }
 
 func (peerster *Peerster) addToPrivateMessages(private messaging.PrivateMessage) {
-	privateMessagesFromPeer, ok := peerster.ReceivedPrivateMessages[private.Origin]
+	peerster.ReceivedPrivateMessages.Mutex.Lock()
+	defer peerster.ReceivedPrivateMessages.Mutex.Unlock()
+	privateMessagesFromPeer, ok := peerster.ReceivedPrivateMessages.Map[private.Origin]
 	if !ok {
-		peerster.ReceivedPrivateMessages[private.Origin] = []messaging.PrivateMessage{}
-		privateMessagesFromPeer = peerster.ReceivedPrivateMessages[private.Origin]
+		peerster.ReceivedPrivateMessages.Map[private.Origin] = []messaging.PrivateMessage{}
+		privateMessagesFromPeer = peerster.ReceivedPrivateMessages.Map[private.Origin]
 	}
-	peerster.ReceivedPrivateMessages[private.Origin] = append(privateMessagesFromPeer, private)
+	peerster.ReceivedPrivateMessages.Map[private.Origin] = append(privateMessagesFromPeer, private)
 }
 
 // Adds a new message to the list of received messages, if it has not already been received.
 // Returns a boolean signifying whether the rumor was new or not
 func (peerster *Peerster) addToReceivedMessages(rumor messaging.RumorMessage) bool {
-	messagesFromPeer := peerster.ReceivedMessages[rumor.Origin]
+	peerster.ReceivedMessages.Mutex.Lock()
+	defer peerster.ReceivedMessages.Mutex.Unlock()
+	messagesFromPeer := peerster.ReceivedMessages.Map[rumor.Origin]
 	if messagesFromPeer == nil {
-		peerster.ReceivedMessages[rumor.Origin] = []messaging.RumorMessage{}
-		messagesFromPeer = peerster.ReceivedMessages[rumor.Origin]
+		peerster.ReceivedMessages.Map[rumor.Origin] = []messaging.RumorMessage{}
+		messagesFromPeer = peerster.ReceivedMessages.Map[rumor.Origin]
 	}
 	fmt.Printf("RumorID: %v, lenmsgs: %v, origin: %s \n", rumor.ID, len(messagesFromPeer), rumor.Origin)
 	if int(rumor.ID)-1 == len(messagesFromPeer) {
 		//fmt.Println("We get to this position, whats up", rumor.ID, rumor.Origin, len(messagesFromPeer))
-		peerster.ReceivedMessages[rumor.Origin] = append(peerster.ReceivedMessages[rumor.Origin], rumor)
+		peerster.ReceivedMessages.Map[rumor.Origin] = append(peerster.ReceivedMessages.Map[rumor.Origin], rumor)
 		return true
 	}
 	return false

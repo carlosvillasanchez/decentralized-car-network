@@ -93,10 +93,12 @@ func (peerster *Peerster) indexReadFile(file []byte, fileName string) { //TODO r
 		FileSize:     0, // TODO filesize unnecessary? why did i add this
 	}
 	fmt.Printf("MetafileHash: %s, ChunkLength: %v \n", hex.EncodeToString(metafileHash), len(chunks)) // RemoveTag
-	peerster.SharedFiles[string(metafileHash)] = sharedFile
+	peerster.SharedFiles.Mutex.Lock()
+	defer peerster.SharedFiles.Mutex.Unlock()
+	peerster.SharedFiles.Map[string(metafileHash)] = sharedFile
 	for i := range chunkHashes {
 		fmt.Println(i, chunkHashes[i])
-		peerster.FileChunks[string(chunkHashes[i])] = chunks[i]
+		peerster.FileChunks.Map[string(chunkHashes[i])] = chunks[i]
 	}
 }
 
@@ -107,6 +109,8 @@ func (peerster *Peerster) indexReconstructedFile(file FileBeingDownloaded) {
 		FileSize:     0,
 	}
 	fmt.Printf("Index reconstructed %v, %s", file.MetafileHash, file.Metafile)
-	peerster.SharedFiles[string(file.MetafileHash)] = sharedFile // TODO needs to be mutex
+	peerster.SharedFiles.Mutex.Lock()
+	defer peerster.SharedFiles.Mutex.Unlock()
+	peerster.SharedFiles.Map[string(file.MetafileHash)] = sharedFile // TODO needs to be mutex
 	// if this is not mutex when youre reviewing i will buy you a beer
 }

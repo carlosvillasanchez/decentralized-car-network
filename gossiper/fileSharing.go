@@ -131,7 +131,9 @@ func (peerster *Peerster) downloadData(peerIdentifier string, previousDownloadSe
 				// TODO verify that data is correct
 				fileBeingDownloaded.DownloadedData = append(fileBeingDownloaded.DownloadedData, reply.Data...)
 				fileBeingDownloaded.CurrentChunk++
-				peerster.FileChunks[string(reply.HashValue)] = reply.Data //TODO make mutex!!!!! THREAD SAFETY!!!!
+				peerster.FileChunks.Mutex.Lock()
+				peerster.FileChunks.Map[string(reply.HashValue)] = reply.Data //TODO make mutex!!!!! THREAD SAFETY!!!!
+				peerster.FileChunks.Mutex.Unlock()
 				// if youre reviewing this and this isnt thread safe i will buy you a beer
 			}
 			peerster.DownloadingFiles.setValue(index, fileBeingDownloaded)
@@ -192,10 +194,14 @@ func (peerster *Peerster) handleIncomingDataRequest(request *messaging.DataReque
 	if request.Destination == peerster.Name {
 		//TODO we see if we have the file, and then send it back
 		var data []byte
-		file, ok := peerster.SharedFiles[string(request.HashValue)]
+		peerster.SharedFiles.Mutex.RLock()
+		file, ok := peerster.SharedFiles.Map[string(request.HashValue)]
+		peerster.SharedFiles.Mutex.RUnlock()
 		if !ok {
 			//TODO Its not a file, so must be a chunk
-			chunk, ok := peerster.FileChunks[string(request.HashValue)]
+			peerster.FileChunks.Mutex.RLock()
+			chunk, ok := peerster.FileChunks.Map[string(request.HashValue)]
+			peerster.FileChunks.Mutex.RUnlock()
 			if !ok {
 				fmt.Println("Warning: A file request requested a chunk we don't have.", request.HashValue)
 			}
