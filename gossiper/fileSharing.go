@@ -60,7 +60,7 @@ func (d *DownloadingFiles) isFullyDownloaded(index string) bool {
 	d.Mutex.RLock()
 	defer d.Mutex.RUnlock()
 	f := d.Map[index]
-	return f.CurrentChunk*HashSize >= len(f.Metafile)
+	return len(f.Metafile) > 0 && f.CurrentChunk*HashSize >= len(f.Metafile)
 }
 
 func (d *DownloadingFiles) incrementCurrentChunk(index string) {
@@ -121,18 +121,16 @@ func (peerster *Peerster) downloadData(peerIdentifier string, previousDownloadSe
 				return
 			}
 			// Verifying that the data is what we expected
-			//TODO test that this works
 			if !verifyFileChunk(hash, reply.Data) {
 				return
 			}
 			if fileBeingDownloaded.Metafile == nil {
 				fileBeingDownloaded.Metafile = reply.Data
 			} else {
-				// TODO verify that data is correct
 				fileBeingDownloaded.DownloadedData = append(fileBeingDownloaded.DownloadedData, reply.Data...)
 				fileBeingDownloaded.CurrentChunk++
 				peerster.FileChunks.Mutex.Lock()
-				peerster.FileChunks.Map[string(reply.HashValue)] = reply.Data //TODO make mutex!!!!! THREAD SAFETY!!!!
+				peerster.FileChunks.Map[string(reply.HashValue)] = reply.Data
 				peerster.FileChunks.Mutex.Unlock()
 				// if youre reviewing this and this isnt thread safe i will buy you a beer
 			}
@@ -192,13 +190,13 @@ func (peerster *Peerster) handleIncomingDataRequest(request *messaging.DataReque
 	fmt.Println("Request for file has come. Values:", request.Destination, request.HashValue, originAddr.String(), request.Origin) // RemoveTag
 
 	if request.Destination == peerster.Name {
-		//TODO we see if we have the file, and then send it back
+		//we see if we have the metafile, and then send it back
 		var data []byte
 		peerster.SharedFiles.Mutex.RLock()
 		file, ok := peerster.SharedFiles.Map[string(request.HashValue)]
 		peerster.SharedFiles.Mutex.RUnlock()
 		if !ok {
-			//TODO Its not a file, so must be a chunk
+			//Its not a metafile request, so must be a chunk
 			peerster.FileChunks.Mutex.RLock()
 			chunk, ok := peerster.FileChunks.Map[string(request.HashValue)]
 			peerster.FileChunks.Mutex.RUnlock()

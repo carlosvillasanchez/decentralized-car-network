@@ -83,7 +83,7 @@ func (peerster *Peerster) createConnection(origin Origin) (net.UDPConn, error) {
 func (peerster *Peerster) clientReceive(message messaging.Message) {
 	destinationString := ""
 	if message.Destination != nil {
-		destinationString = "dest " + *message.Destination
+		destinationString = " dest " + *message.Destination
 	}
 	fmt.Println("CLIENT MESSAGE " + message.Text + destinationString)
 
