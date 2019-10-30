@@ -43,15 +43,30 @@ func createPeerster() gossiper.Peerster {
 			RumormongeringSessions: map[string]messaging.RumormongeringSession{},
 			Mutex:                  sync.RWMutex{},
 		},
-		ReceivedMessages:        map[string][]messaging.RumorMessage{},
-		ReceivedPrivateMessages: map[string][]messaging.PrivateMessage{},
-		MsgSeqNumber:            1,
-		Want:                    []messaging.PeerStatus{},
-		Conn:                    net.UDPConn{},
-		RTimer:                  *rTimer,
-		NextHopTable:            map[string]string{},
-		SharedFiles:             map[string]gossiper.SharedFile{},
-		FileChunks:              map[string][]byte{},
+		ReceivedMessages: struct {
+			Map   map[string][]messaging.RumorMessage
+			Mutex sync.RWMutex
+		}{Map: map[string][]messaging.RumorMessage{}, Mutex: sync.RWMutex{}},
+		ReceivedPrivateMessages: struct {
+			Map   map[string][]messaging.PrivateMessage
+			Mutex sync.RWMutex
+		}{Map: map[string][]messaging.PrivateMessage{}, Mutex: sync.RWMutex{}},
+		MsgSeqNumber: 1,
+		Want:         []messaging.PeerStatus{},
+		Conn:         net.UDPConn{},
+		RTimer:       *rTimer,
+		NextHopTable: struct {
+			Map   map[string]string
+			Mutex sync.RWMutex
+		}{Map: map[string]string{}, Mutex: sync.RWMutex{}},
+		SharedFiles: struct {
+			Map   map[string]gossiper.SharedFile
+			Mutex sync.RWMutex
+		}{Map: map[string]gossiper.SharedFile{}, Mutex: sync.RWMutex{}},
+		FileChunks: struct {
+			Map   map[string][]byte
+			Mutex sync.RWMutex
+		}{Map: map[string][]byte{}, Mutex: sync.RWMutex{}},
 		DownloadingFiles: gossiper.DownloadingFiles{
 			Map:   map[string]gossiper.FileBeingDownloaded{},
 			Mutex: sync.RWMutex{},
