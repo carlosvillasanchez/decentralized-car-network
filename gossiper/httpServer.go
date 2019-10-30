@@ -87,7 +87,7 @@ func (peerster *Peerster) handleId(w http.ResponseWriter, req *http.Request) {
 }
 
 func (peerster *Peerster) handleHopTable(w http.ResponseWriter, req *http.Request) {
-	sendValueAsJson(w, req, peerster.NextHopTable)
+	sendValueAsJson(w, req, peerster.NextHopTable.Map)
 }
 
 func (peerster *Peerster) handleFileShare(w http.ResponseWriter, req *http.Request) {

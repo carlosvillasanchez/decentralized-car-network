@@ -30,7 +30,7 @@ type Peerster struct {
 	AntiEntropyTimer int
 	Want             []messaging.PeerStatus
 	MsgSeqNumber     uint32
-	ReceivedMessages struct {
+	ReceivedMessages struct { //TODO is there a nice way to make a generic mutex map type, instead of having to do this every time?
 		Map   map[string][]messaging.RumorMessage
 		Mutex sync.RWMutex
 	}
