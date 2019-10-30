@@ -120,6 +120,11 @@ func (peerster *Peerster) downloadData(peerIdentifier string, previousDownloadSe
 				// TODO is that a possible case? ??? ??? ????
 				return
 			}
+			// Verifying that the data is what we expected
+			//TODO test that this works
+			if !verifyFileChunk(hash, reply.Data) {
+				return
+			}
 			if fileBeingDownloaded.Metafile == nil {
 				fileBeingDownloaded.Metafile = reply.Data
 			} else {

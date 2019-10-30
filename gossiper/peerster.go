@@ -32,7 +32,7 @@ type Peerster struct {
 	MsgSeqNumber            uint32
 	ReceivedMessages        map[string][]messaging.RumorMessage
 	ReceivedPrivateMessages map[string][]messaging.PrivateMessage
-	RumormongeringSessions  messaging.AtomicRumormongeringSessionMap //TODO is this necessary?
+	RumormongeringSessions  messaging.AtomicRumormongeringSessionMap
 	Conn                    net.UDPConn
 	RTimer                  int
 	NextHopTable            map[string]string
@@ -178,11 +178,14 @@ func (peerster *Peerster) handleIncomingRumor(rumor *messaging.RumorMessage, ori
 	fmt.Printf("RUMOR origin %s from %s ID %v contents %s \n", rumor.Origin, originAddr.String(), rumor.ID, rumor.Text)
 	peerster.addToWantStruct(rumor.Origin, rumor.ID)
 	peerster.addToReceivedMessages(*rumor)
-	peerster.addToNextHopTable(rumor.Origin, originAddr.String())
 	if rumor.Text != "" {
 		fmt.Printf("DSDV %s %s \n", rumor.Origin, originAddr.String())
 	}
 	isNew := peerster.updateWantStruct(rumor.Origin, rumor.ID)
+	if isNew {
+		// We add the originaddress to the next hop table if it's a new message
+		peerster.addToNextHopTable(*rumor, originAddr.String())
+	}
 	isFromMyself := originAddr.String() == peerster.GossipAddress
 	peer := ""
 	//fmt.Printf("ISNEW: %v ISFROMMYSELF: %v COINFLIP: %v", isNew, isFromMyself, coinflip)

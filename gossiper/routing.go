@@ -6,15 +6,8 @@ import (
 	"time"
 )
 
-func (peerster *Peerster) addToNextHopTable(id, originAddr string) {
-	_, exists := peerster.NextHopTable[id]
-	if exists {
-		fmt.Println("Tried to add peer that already exists in dhsv: ", id, originAddr)
-		return
-	}
-	hopTable := peerster.NextHopTable
-	hopTable[id] = originAddr
-	peerster.NextHopTable = hopTable
+func (peerster *Peerster) addToNextHopTable(rumor messaging.RumorMessage, originAddr string) {
+	peerster.NextHopTable[rumor.Origin] = originAddr
 }
 
 // Sends
@@ -44,7 +37,6 @@ func (peerster *Peerster) nextHopRoute(packet *messaging.GossipPacket, destinati
 	for i := range peerster.NextHopTable {
 		fmt.Println(i, peerster.NextHopTable[i], destination)
 	}
-
 	if ok {
 		err := peerster.sendToPeer(nextHopAddr, *packet, []string{})
 		if err != nil {

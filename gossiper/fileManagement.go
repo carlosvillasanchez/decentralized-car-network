@@ -2,6 +2,7 @@ package gossiper
 
 import (
 	"crypto"
+	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
 	"io/ioutil"
@@ -49,6 +50,19 @@ func computeMetafile(chunks [][]byte) (metafile []byte, metafileHash []byte) {
 func reconstructAndSaveFile(downloaded FileBeingDownloaded) error {
 	data := append([]byte{}, downloaded.DownloadedData...)
 	return ioutil.WriteFile(DownloadedFilesPath+downloaded.FileName, data, 0644)
+}
+
+// Verifies that a file has a specific hash
+func verifyFileChunk(requestedHash, retrievedData []byte) bool {
+	sha256 := sha256.New()
+	sha256.Write(retrievedData)
+	retrievedDataHash := sha256.Sum(nil)
+	for i := range requestedHash {
+		if retrievedDataHash[i] != requestedHash[i] {
+			return false
+		}
+	}
+	return true
 }
 
 // A struct that contains all the metadata for a specific file
