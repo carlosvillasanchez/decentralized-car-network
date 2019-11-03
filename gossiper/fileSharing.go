@@ -200,7 +200,7 @@ func (peerster *Peerster) handleIncomingDataRequest(request *messaging.DataReque
 			chunk, ok := peerster.FileChunks.Map[string(request.HashValue)]
 			peerster.FileChunks.Mutex.RUnlock()
 			if !ok {
-				fmt.Println("Warning: A file request requested a chunk we don't have.", request.HashValue)
+				//fmt.Println("Warning: A file request requested a chunk we don't have.", request.HashValue)
 			}
 			// Chunk can be nil here - which means we don't have the chunk, so sending back a nil value is correct
 			data = chunk

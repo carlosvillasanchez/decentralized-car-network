@@ -79,9 +79,7 @@ func init() {
 }
 func main() {
 	peerster := createPeerster()
-	fmt.Println(peerster.String())
 	addr := messaging.StringAddrToUDPAddr(peerster.GossipAddress)
-	fmt.Println(addr.String(), string(addr.IP), peerster.GossipAddress)
 	go peerster.Listen(gossiper.Server)
 	go peerster.ListenFrontend()
 	peerster.AntiEntropy()
