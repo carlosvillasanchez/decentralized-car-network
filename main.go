@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"github.com/tormey97/Peerster/gossiper"
 	"github.com/tormey97/Peerster/messaging"
 	"math/rand"
@@ -79,7 +78,6 @@ func init() {
 }
 func main() {
 	peerster := createPeerster()
-	addr := messaging.StringAddrToUDPAddr(peerster.GossipAddress)
 	go peerster.Listen(gossiper.Server)
 	go peerster.ListenFrontend()
 	peerster.AntiEntropy()

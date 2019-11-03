@@ -25,7 +25,6 @@ func (peerster *Peerster) SendRouteMessages() {
 	peerster.SendRouteMessage()
 	go func() {
 		for {
-			fmt.Println("SENDING ROUTE MSG")
 			time.Sleep(time.Duration(peerster.RTimer) * time.Second)
 			peerster.SendRouteMessage()
 		}

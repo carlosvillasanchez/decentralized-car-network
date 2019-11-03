@@ -104,7 +104,6 @@ func (peerster *Peerster) clientReceive(message messaging.Message) {
 				fmt.Printf("Warning: Invalid input %s from client when requesting file \n", message.Request)
 				return
 			}
-			fmt.Println("DST: ", dst)
 			file := FileBeingDownloaded{
 				MetafileHash:   dst,
 				Channel:        make(chan messaging.DataReply),
