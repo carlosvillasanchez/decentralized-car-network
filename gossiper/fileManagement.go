@@ -26,9 +26,9 @@ func chunkFile(file []byte) (chunks [][]byte, chunkHashes [][]byte) {
 		}
 		chunk := file[i*ChunkSize : upperBound]
 		chunks = append(chunks, chunk)
-		sha256 := crypto.SHA256.New()
-		sha256.Write(chunks[i])
-		chunkHashes = append(chunkHashes, sha256.Sum(nil))
+		hash := crypto.SHA256.New()
+		hash.Write(chunks[i])
+		chunkHashes = append(chunkHashes, hash.Sum(nil))
 	}
 	return
 }
@@ -36,13 +36,13 @@ func chunkFile(file []byte) (chunks [][]byte, chunkHashes [][]byte) {
 // Creates a metafile and a hash of the metafile from an array of file chunks
 func computeMetafile(chunks [][]byte) (metafile []byte, metafileHash []byte) {
 	for i := range chunks {
-		sha256 := crypto.SHA256.New()
-		sha256.Write(chunks[i])
-		metafile = append(metafile, sha256.Sum(nil)...)
+		hash := crypto.SHA256.New()
+		hash.Write(chunks[i])
+		metafile = append(metafile, hash.Sum(nil)...)
 	}
-	sha256 := crypto.SHA256.New()
-	sha256.Write(metafile)
-	metafileHash = sha256.Sum(nil)
+	hash := crypto.SHA256.New()
+	hash.Write(metafile)
+	metafileHash = hash.Sum(nil)
 	return
 }
 
@@ -54,9 +54,9 @@ func reconstructAndSaveFile(downloaded FileBeingDownloaded) error {
 
 // Verifies that a file has a specific hash
 func verifyFileChunk(requestedHash, retrievedData []byte) bool {
-	sha256 := sha256.New()
-	sha256.Write(retrievedData)
-	retrievedDataHash := sha256.Sum(nil)
+	hash := sha256.New()
+	hash.Write(retrievedData)
+	retrievedDataHash := hash.Sum(nil)
 	for i := range requestedHash {
 		if retrievedDataHash[i] != requestedHash[i] {
 			return false

@@ -65,23 +65,18 @@ type DataReply struct {
 }
 
 type RumormongeringSession struct {
-	Message  RumorMessage
-	TimeLeft int
-	Active   bool
-	Channel  chan RumorMessage
-	Mutex    sync.RWMutex
-}
-
-func (r *RumormongeringSession) DecrementTimer() {
-	r.Mutex.Lock()
-	r.TimeLeft--
-	r.Mutex.Unlock()
+	Message RumorMessage
+	Active  bool
+	Channel chan bool
+	Mutex   sync.RWMutex
 }
 
 func (r *RumormongeringSession) ResetTimer() {
-	r.Mutex.Lock()
-	r.TimeLeft = 10
-	r.Mutex.Unlock()
+	r.Mutex.RLock()
+	defer r.Mutex.RUnlock()
+	if r.Active {
+		r.Channel <- false // False means "don't interrupt"
+	}
 }
 
 func (r *RumormongeringSession) SetActive(value bool) {
@@ -120,22 +115,18 @@ func (a *AtomicRumormongeringSessionMap) ActivateSession(index string) bool {
 	}
 	if !session.Active {
 		session.SetActive(true)
-		session.ResetTimer()
 		a.RumormongeringSessions[index] = session
 		return true
 	}
 	return false
 }
 
-func (a *AtomicRumormongeringSessionMap) DecrementTimer(index string) {
-	a.Mutex.Lock()
-	defer a.Mutex.Unlock()
-	session, ok := a.RumormongeringSessions[index]
-	if !ok {
-		return
+func (a *AtomicRumormongeringSessionMap) InterruptSession(index string) {
+	a.Mutex.RLock()
+	defer a.Mutex.RUnlock()
+	if a.RumormongeringSessions[index].Active {
+		a.RumormongeringSessions[index].Channel <- true
 	}
-	session.DecrementTimer()
-	a.RumormongeringSessions[index] = session
 }
 
 func (a *AtomicRumormongeringSessionMap) DeactivateSession(index string) {

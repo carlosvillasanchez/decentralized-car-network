@@ -145,32 +145,42 @@ func (peerster *Peerster) sendNewPrivateMessage(msg messaging.Message) {
 }
 func (peerster *Peerster) startRumormongeringSession(peer string, message messaging.RumorMessage) error {
 	session, ok := peerster.RumormongeringSessions.GetSession(peer)
-	if !ok || session == (messaging.RumormongeringSession{}) {
+	if !ok || session.Active == false {
 		session = messaging.RumormongeringSession{
-			Message:  message,
-			TimeLeft: 10,
-			Channel:  make(chan messaging.RumorMessage),
-			Active:   false,
-			Mutex:    sync.RWMutex{},
+			Message: message,
+			Channel: make(chan bool),
+			Active:  false,
+			Mutex:   sync.RWMutex{},
 		}
 		peerster.RumormongeringSessions.SetSession(peer, session)
 	}
 
-	//fmt.Printf("Starting sessoin, active: %b, timeleft: %v, message: %s, peer: %s, \n", session.Active, session.TimeLeft, message, peer)
+	//fmt.Printf("Starting sessoin, active: %b, timeleft: %v, message: %s, peer: %s, \n", session.Active, session.Message, message, peer)
 	if peerster.RumormongeringSessions.ActivateSession(peer) {
 		go func() {
-			//fmt.Printf("TimeLeft: %v, Active: %v \n",peerster.RumormongeringSessions.GetSession(peer).TimeLeft, peerster.RumormongeringSessions.GetSession(peer).Active)
-			for session, _ := peerster.RumormongeringSessions.GetSession(peer); session.TimeLeft > 0 && session.Active; {
-				peerster.RumormongeringSessions.DecrementTimer(peer)
-				//fmt.Printf("Timer decremented. %v\n", peerster.RumormongeringSessions.GetSession(peer))
-				time.Sleep(1000 * time.Millisecond) //TODO this is bad
-			}
-			//fmt.Printf("SESSION TIMEOUT, PEER: %s \n", peer)
 			session, ok := peerster.RumormongeringSessions.GetSession(peer)
-			if ok && session.Active {
-				peerster.handleIncomingRumor(&session.Message, messaging.StringAddrToUDPAddr(peerster.GossipAddress), false) // we rerun
+			if !ok {
+				return
 			}
-			peerster.RumormongeringSessions.DeactivateSession(peer)
+			timedOut := false
+			interrupted := false
+			for !timedOut && !interrupted {
+				select {
+				case interrupt := <-session.Channel:
+					if interrupt {
+						interrupted = true
+					}
+				case <-time.After(10 * time.Second):
+					timedOut = true
+				}
+			}
+			if timedOut {
+				session, ok := peerster.RumormongeringSessions.GetSession(peer)
+				peerster.RumormongeringSessions.DeactivateSession(peer)
+				if ok {
+					peerster.handleIncomingRumor(&session.Message, messaging.StringAddrToUDPAddr(peerster.GossipAddress), false) // we rerun
+				}
+			}
 		}()
 	} else {
 		peerster.RumormongeringSessions.ResetTimer(peer)
@@ -180,6 +190,7 @@ func (peerster *Peerster) startRumormongeringSession(peer string, message messag
 }
 
 func (peerster *Peerster) stopRumormongeringSession(peer string) {
+	peerster.RumormongeringSessions.InterruptSession(peer)
 	peerster.RumormongeringSessions.DeactivateSession(peer)
 }
 
@@ -284,7 +295,7 @@ func (peerster *Peerster) handleIncomingStatusPacket(packet *messaging.StatusPac
 	}
 	fmt.Println()
 	// End printing
-	peerster.RumormongeringSessions.ResetTimer(originAddr.String()) //TODO verify that this makes sense
+	//peerster.RumormongeringSessions.ResetTimer(originAddr.String()) //TODO verify that this makes sense
 	wantMap := createWantMap(peerster.Want)
 
 	//Handles the case where the other peer doesn't even know about a certain peer we know about
