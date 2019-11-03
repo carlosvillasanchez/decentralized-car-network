@@ -3,7 +3,6 @@ package gossiper
 import (
 	"crypto"
 	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"io/ioutil"
 )
@@ -49,6 +48,7 @@ func computeMetafile(chunks [][]byte) (metafile []byte, metafileHash []byte) {
 // Will reconstruct a file from a set of chunks, and save it in _Downloads
 func reconstructAndSaveFile(downloaded FileBeingDownloaded) error {
 	data := append([]byte{}, downloaded.DownloadedData...)
+	fmt.Printf("RECONSTRUCTED file %s \n", downloaded.FileName)
 	return ioutil.WriteFile(DownloadedFilesPath+downloaded.FileName, data, 0644)
 }
 
@@ -92,12 +92,12 @@ func (peerster *Peerster) indexReadFile(file []byte, fileName string) { //TODO r
 		MetafileHash: metafileHash,
 		FileSize:     0, // TODO filesize unnecessary? why did i add this
 	}
-	fmt.Printf("MetafileHash: %s, ChunkLength: %v \n", hex.EncodeToString(metafileHash), len(chunks)) // RemoveTag
+	//fmt.Printf("MetafileHash: %s, ChunkLength: %v \n", hex.EncodeToString(metafileHash), len(chunks)) // RemoveTag
 	peerster.SharedFiles.Mutex.Lock()
 	defer peerster.SharedFiles.Mutex.Unlock()
 	peerster.SharedFiles.Map[string(metafileHash)] = sharedFile
 	for i := range chunkHashes {
-		fmt.Println(i, chunkHashes[i])
+		//fmt.Println(i, chunkHashes[i])
 		peerster.FileChunks.Map[string(chunkHashes[i])] = chunks[i]
 	}
 }

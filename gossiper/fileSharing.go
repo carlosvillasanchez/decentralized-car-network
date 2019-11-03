@@ -103,6 +103,9 @@ func (peerster *Peerster) sendDataRequest(destination string, hash []byte) {
 func (peerster *Peerster) downloadData(peerIdentifier string, previousDownloadSession FileBeingDownloaded) {
 	hash := previousDownloadSession.getHashToSend()
 	index := string(hash)
+	if previousDownloadSession.Metafile != nil {
+		fmt.Printf("DOWNLOADING %s chunk %v from %s \n", previousDownloadSession.FileName, previousDownloadSession.CurrentChunk+1, peerIdentifier)
+	}
 	peerster.DownloadingFiles.setValue(index, previousDownloadSession)
 	peerster.sendDataRequest(peerIdentifier, hash)
 	go func() {
@@ -135,7 +138,7 @@ func (peerster *Peerster) downloadData(peerIdentifier string, previousDownloadSe
 			peerster.DownloadingFiles.setValue(index, fileBeingDownloaded)
 
 		case <-time.After(5 * time.Second):
-			fmt.Printf("DownloadingFiles session timeout with hash %v \n", hash)
+			//fmt.Printf("DownloadingFiles session timeout with hash %v \n", hash)
 		}
 		value, ok = peerster.DownloadingFiles.getValue(index)
 		if !ok {

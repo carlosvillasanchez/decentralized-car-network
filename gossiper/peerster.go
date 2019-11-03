@@ -82,7 +82,7 @@ func (peerster *Peerster) createConnection(origin Origin) (net.UDPConn, error) {
 
 func (peerster *Peerster) clientReceive(message messaging.Message) {
 	destinationString := ""
-	if message.Destination != nil {
+	if message.Destination != nil && *message.Destination != "" {
 		destinationString = " dest " + *message.Destination
 	}
 	fmt.Println("CLIENT MESSAGE " + message.Text + destinationString)
@@ -114,6 +114,7 @@ func (peerster *Peerster) clientReceive(message messaging.Message) {
 				DownloadedData: nil,
 				FileName:       message.File,
 			}
+			fmt.Printf("DOWNLOADING metafile of %s from %s \n", file.FileName, *message.Destination)
 			peerster.downloadData(*message.Destination, file)
 		} else if message.Destination == nil || *message.Destination == "" {
 			peerster.sendNewRumorMessage(message.Text)
@@ -273,7 +274,7 @@ func (peerster *Peerster) handleIncomingPrivateMessage(message *messaging.Privat
 		return
 	}
 	if message.Destination == peerster.Name {
-		fmt.Printf("PRIVATE MESSAGE origin %s hop-limit %v contents %s \n", message.Origin, message.HopLimit, message.Text)
+		fmt.Printf("PRIVATE origin %s hop-limit %v contents %s \n", message.Origin, message.HopLimit, message.Text)
 		peerster.addToPrivateMessages(*message)
 	} else {
 		message.HopLimit--
