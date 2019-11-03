@@ -139,7 +139,7 @@ func (peerster *Peerster) sendNewPrivateMessage(msg messaging.Message) {
 		ID:          0,
 		Text:        msg.Text,
 		Destination: *msg.Destination,
-		HopLimit:    11,
+		HopLimit:    10,
 	}
 	peerster.handleIncomingPrivateMessage(&private, messaging.StringAddrToUDPAddr(peerster.GossipAddress))
 }
@@ -149,6 +149,7 @@ func (peerster *Peerster) startRumormongeringSession(peer string, message messag
 		session = messaging.RumormongeringSession{
 			Message:  message,
 			TimeLeft: 10,
+			Channel:  make(chan messaging.RumorMessage),
 			Active:   false,
 			Mutex:    sync.RWMutex{},
 		}
@@ -253,7 +254,6 @@ func (peerster *Peerster) sendStatusPacket(peer string) error {
 	packet := messaging.GossipPacket{
 		Status: &messaging.StatusPacket{Want: peerster.Want},
 	}
-	fmt.Printf("Sending a status packet to %s \n", peer)
 	return peerster.sendToPeer(peer, packet, []string{})
 }
 
@@ -364,8 +364,6 @@ func (peerster *Peerster) handleIncomingStatusPacket(packet *messaging.StatusPac
 
 func (peerster *Peerster) considerRumormongering() bool {
 	num := rand.Intn(40)
-	fmt.Printf("Flipping coin. Random number (0, 1): %v \n", num)
-	fmt.Println()
 	return num > 9
 }
 
@@ -489,7 +487,6 @@ func (peerster *Peerster) addToReceivedMessages(rumor messaging.RumorMessage) bo
 		peerster.ReceivedMessages.Map[rumor.Origin] = []messaging.RumorMessage{}
 		messagesFromPeer = peerster.ReceivedMessages.Map[rumor.Origin]
 	}
-	fmt.Printf("RumorID: %v, lenmsgs: %v, origin: %s \n", rumor.ID, len(messagesFromPeer), rumor.Origin)
 	if int(rumor.ID)-1 == len(messagesFromPeer) {
 		//fmt.Println("We get to this position, whats up", rumor.ID, rumor.Origin, len(messagesFromPeer))
 		peerster.ReceivedMessages.Map[rumor.Origin] = append(peerster.ReceivedMessages.Map[rumor.Origin], rumor)
@@ -595,8 +592,8 @@ func (peerster Peerster) sendToPeer(peer string, packet messaging.GossipPacket, 
 	if err != nil {
 		return err
 	}
-	n, err := peerster.Conn.WriteToUDP(packetBytes, &peerAddr)
-	fmt.Printf("Amount of bytes written: %v | written to: %s \n", n, peerAddr.String())
+	_, err = peerster.Conn.WriteToUDP(packetBytes, &peerAddr)
+	//fmt.Printf("Amount of bytes written: %v | written to: %s \n", n, peerAddr.String())
 	if err != nil {
 		return err
 	}

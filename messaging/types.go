@@ -68,6 +68,7 @@ type RumormongeringSession struct {
 	Message  RumorMessage
 	TimeLeft int
 	Active   bool
+	Channel  chan RumorMessage
 	Mutex    sync.RWMutex
 }
 

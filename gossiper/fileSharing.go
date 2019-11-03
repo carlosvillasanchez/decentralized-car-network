@@ -31,8 +31,6 @@ func (f *FileBeingDownloaded) getHashToSend() []byte {
 	if lowerBound > upperBound {
 		lowerBound = 0
 	}
-	fmt.Println((f.CurrentChunk + 1) * HashSize)                                                                                                                  // RemoveTag
-	fmt.Printf("THE HASH TO SEND IS: %v lowerb: %v higherb: %v, len: %v, \n", string(f.Metafile[lowerBound:upperBound]), lowerBound, upperBound, len(f.Metafile)) // RemoveTag
 	return f.Metafile[lowerBound:upperBound]
 }
 
@@ -168,7 +166,6 @@ func (peerster *Peerster) handleIncomingDataReply(reply *messaging.DataReply, or
 	if reply == nil {
 		return
 	}
-	fmt.Println("Reply for file has come. Values:", reply.Data, originAddr.String(), reply.Origin) // RemoveTag
 	// TODO We need to check if the thing doesnt have a metafile, if it doesnt then it was a metafile request
 	if reply.Destination == peerster.Name {
 		index := string(reply.HashValue)
@@ -187,7 +184,6 @@ func (peerster *Peerster) handleIncomingDataRequest(request *messaging.DataReque
 	if request == nil {
 		return
 	}
-	fmt.Println("Request for file has come. Values:", request.Destination, request.HashValue, originAddr.String(), request.Origin) // RemoveTag
 
 	if request.Destination == peerster.Name {
 		//we see if we have the metafile, and then send it back
@@ -203,19 +199,16 @@ func (peerster *Peerster) handleIncomingDataRequest(request *messaging.DataReque
 			if !ok {
 				fmt.Println("Warning: A file request requested a chunk we don't have.", request.HashValue)
 			}
-			fmt.Println("He wants chunk.") // RemoveTag
 			// Chunk can be nil here - which means we don't have the chunk, so sending back a nil value is correct
 			data = chunk
 		} else {
 			// This means the request was for a metafile we have
-			fmt.Println("He wants metafile.", file.Metafile) // RemoveTag
 			data = file.Metafile
 		}
-		fmt.Println("The data is: ", data) // RemoveTag
 		reply := &messaging.DataReply{
 			Origin:      peerster.Name,
 			Destination: request.Origin,
-			HopLimit:    11, //TODO make constant
+			HopLimit:    10, //TODO make constant
 			HashValue:   request.HashValue,
 			Data:        data,
 		}

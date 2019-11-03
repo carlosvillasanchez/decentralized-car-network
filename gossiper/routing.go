@@ -36,7 +36,6 @@ func (peerster *Peerster) SendRouteMessages() {
 func (peerster *Peerster) nextHopRoute(packet *messaging.GossipPacket, destination string) {
 	peerster.NextHopTable.Mutex.RLock()
 	nextHopAddr, ok := peerster.NextHopTable.Map[destination]
-	fmt.Println(nextHopAddr, destination, "THIS IS IT BOIS")
 	for i := range peerster.NextHopTable.Map {
 		fmt.Println(i, peerster.NextHopTable.Map[i], destination)
 	}
