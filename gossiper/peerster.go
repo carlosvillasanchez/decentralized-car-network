@@ -348,7 +348,7 @@ func (peerster *Peerster) handleIncomingStatusPacket(packet *messaging.StatusPac
 				Rumor: &nextMsg,
 			}, []string{})
 			if err != nil {
-				fmt.Printf("Could not send missing rumor to peer, reason: %s", err)
+				fmt.Printf("Could not send missing rumor to peer, reason: %s \n", err)
 			}
 			return
 		} else if myWant.NextID < otherPeerWant.NextID {

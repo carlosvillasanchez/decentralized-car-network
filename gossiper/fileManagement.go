@@ -108,7 +108,7 @@ func (peerster *Peerster) indexReconstructedFile(file FileBeingDownloaded) {
 		MetafileHash: file.MetafileHash,
 		FileSize:     0,
 	}
-	fmt.Printf("Index reconstructed %v, %s", file.MetafileHash, file.Metafile)
+	//fmt.Printf("Index reconstructed %v, %s", file.MetafileHash, file.Metafile)
 	peerster.SharedFiles.Mutex.Lock()
 	defer peerster.SharedFiles.Mutex.Unlock()
 	peerster.SharedFiles.Map[string(file.MetafileHash)] = sharedFile // TODO needs to be mutex

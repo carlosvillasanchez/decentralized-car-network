@@ -142,7 +142,7 @@ func (peerster *Peerster) downloadData(peerIdentifier string, previousDownloadSe
 		}
 		value, ok = peerster.DownloadingFiles.getValue(index)
 		if !ok {
-			fmt.Printf("Warning: was unable to find the file download session when it should exist. Probably a bug")
+			//fmt.Printf("Warning: was unable to find the file download session when it should exist. Probably a bug \n")
 		}
 		if peerster.DownloadingFiles.isFullyDownloaded(index) {
 			err := reconstructAndSaveFile(value)
