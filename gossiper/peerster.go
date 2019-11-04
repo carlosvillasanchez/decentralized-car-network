@@ -253,12 +253,12 @@ func createWantMap(want []messaging.PeerStatus) (wantMap map[string]messaging.Pe
 // Returns a slice of the missing messages that you have and another peer doesn't
 func (peerster *Peerster) getMissingMessages(theirNextId, myNextId uint32, origin string) (messages []messaging.RumorMessage) {
 	//fmt.Printf("TheirNext: %v, myNext: %v, origin: %q", theirNextId, myNextId, origin)
+	peerster.ReceivedMessages.Mutex.RLock()
 	for i := theirNextId - 1; i < myNextId-1; i++ {
 		//fmt.Println("i: ", i)
-		peerster.ReceivedMessages.Mutex.RLock()
 		messages = append(messages, peerster.ReceivedMessages.Map[origin][i])
-		peerster.ReceivedMessages.Mutex.RUnlock()
 	}
+	peerster.ReceivedMessages.Mutex.RUnlock()
 	return
 }
 
