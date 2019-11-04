@@ -255,7 +255,9 @@ func (peerster *Peerster) getMissingMessages(theirNextId, myNextId uint32, origi
 	//fmt.Printf("TheirNext: %v, myNext: %v, origin: %q", theirNextId, myNextId, origin)
 	for i := theirNextId - 1; i < myNextId-1; i++ {
 		//fmt.Println("i: ", i)
+		peerster.ReceivedMessages.Mutex.RLock()
 		messages = append(messages, peerster.ReceivedMessages.Map[origin][i])
+		peerster.ReceivedMessages.Mutex.RUnlock()
 	}
 	return
 }
@@ -455,6 +457,7 @@ func (peerster *Peerster) Listen(origin Origin) {
 			log.Printf("Could not read from connection, origin: %s, reason: %s \n", origin, err)
 			break
 		}
+		//go func() {
 		switch origin {
 		case Client:
 			msg := messaging.Message{}
@@ -463,11 +466,12 @@ func (peerster *Peerster) Listen(origin Origin) {
 				fmt.Printf("Failed to decode message from client, reason: %s \n", err)
 			} else {
 				//fmt.Println("THE MESSAGE IS ", msg.Text)
-				peerster.clientReceive(msg)
+				go peerster.clientReceive(msg)
 			}
 		case Server:
-			peerster.serverReceive(buffer, *originAddr)
+			go peerster.serverReceive(buffer, *originAddr)
 		}
+		//}()
 	}
 }
 
