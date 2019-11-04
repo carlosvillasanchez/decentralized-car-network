@@ -194,6 +194,7 @@ func (peerster *Peerster) stopRumormongeringSession(peer string) {
 }
 
 // Handles an incoming rumor message. A zero-value originAddr means the message came from a client.
+// This also handles messages that are sent by the peerster itself
 func (peerster *Peerster) handleIncomingRumor(rumor *messaging.RumorMessage, originAddr net.UDPAddr, coinflip bool) string {
 	if rumor == nil {
 		return ""
@@ -221,13 +222,11 @@ func (peerster *Peerster) handleIncomingRumor(rumor *messaging.RumorMessage, ori
 		if err != nil {
 			fmt.Printf("Warning: Could not send to random peer. Reason: %s \n", err)
 		}
-		//if isFromMyself || coinflip{ // We sent the message, so we say we are now rumormongering with this guy
 		peerster.stopRumormongeringSession(peer)
 		err = peerster.startRumormongeringSession(peer, *rumor)
 		if err != nil {
 			fmt.Printf("Was not able to start rumormongering session. Coinflip: %v, reason: %s \n", coinflip, err)
 		}
-		//}
 	}
 	if !isFromMyself {
 		err := peerster.sendStatusPacket(originAddr.String())
@@ -290,11 +289,13 @@ func (peerster *Peerster) handleIncomingStatusPacket(packet *messaging.StatusPac
 		return
 	}
 	// Printing for the automated tests
-	fmt.Printf("STATUS from %s ", originAddr.String())
+	statusString := fmt.Sprintf("STATUS from %s ", originAddr.String())
+	//fmt.Printf("STATUS from %s ", originAddr.String())
 	for i := range packet.Want {
-		fmt.Printf("peer %s nextID %v ", packet.Want[i].Identifier, packet.Want[i].NextID)
+		statusString += fmt.Sprintf("peer %s nextID %v ", packet.Want[i].Identifier, packet.Want[i].NextID)
+		//fmt.Printf("peer %s nextID %v ", packet.Want[i].Identifier, packet.Want[i].NextID)
 	}
-	fmt.Println()
+	fmt.Println(statusString)
 	// End printing
 	//peerster.RumormongeringSessions.ResetTimer(originAddr.String()) //TODO verify that this makes sense
 	wantMap := createWantMap(peerster.Want)
@@ -334,7 +335,6 @@ func (peerster *Peerster) handleIncomingStatusPacket(packet *messaging.StatusPac
 	for i := range packet.Want {
 		otherPeerWant := packet.Want[i]
 		myWant := wantMap[otherPeerWant.Identifier]
-		// We check if the peer
 		if myWant == (messaging.PeerStatus{}) && otherPeerWant.Identifier != peerster.Name {
 			//fmt.Printf("unknown peer %q encountered, should send statuspacket \n", otherPeerWant.Identifier)
 			peerster.addToWantStruct(otherPeerWant.Identifier, 1)
@@ -394,6 +394,7 @@ func (peerster *Peerster) chooseRandomPeer() (string, error) {
 	return validPeers[num], nil
 }
 
+// Handles incoming messages from other peers.
 func (peerster *Peerster) serverReceive(buffer []byte, originAddr net.UDPAddr) {
 	receivedPacket := &messaging.GossipPacket{}
 	err := protobuf.Decode(buffer, receivedPacket)
@@ -412,17 +413,15 @@ func (peerster *Peerster) serverReceive(buffer []byte, originAddr net.UDPAddr) {
 		peerster.handleIncomingDataReply(receivedPacket.DataReply, originAddr)
 		peerster.handleIncomingDataRequest(receivedPacket.DataRequest, originAddr)
 	} else {
-		//TODO Handle SimpleMessage and Rumor cases differently. If it's a simplemessage, the relay origin addr is probably inside the message
-
 		fmt.Printf("SIMPLE MESSAGE origin %s from %s contents %s \n", receivedPacket.Simple.OriginalName, receivedPacket.Simple.RelayPeerAddr, receivedPacket.Simple.Contents)
-		blacklist := []string{addr}                                  // we won't send a message to these peers
-		receivedPacket.Simple.RelayPeerAddr = peerster.GossipAddress //TODO this line might not be necessary after part1
+		blacklist := []string{addr} // we won't send a message to these peers
+		receivedPacket.Simple.RelayPeerAddr = peerster.GossipAddress
 		err = peerster.sendToKnownPeers(*receivedPacket, blacklist)
 		if err != nil {
 			fmt.Printf("Error: could not send packet from some other peer, reason: %s \n", err)
 		}
 	}
-	peerster.listPeers()
+	//peerster.listPeers()
 }
 
 // For testing, prints the want structure and all received messages just to see if it$s correct
@@ -443,6 +442,7 @@ func (peerster Peerster) printMessages() {
 	}
 }
 
+// Listens to the network sockets and sends any incoming messages to be processed by the peerster.
 func (peerster *Peerster) Listen(origin Origin) {
 	conn, err := peerster.createConnection(origin)
 	if err != nil {
@@ -457,7 +457,6 @@ func (peerster *Peerster) Listen(origin Origin) {
 			log.Printf("Could not read from connection, origin: %s, reason: %s \n", origin, err)
 			break
 		}
-		//go func() {
 		switch origin {
 		case Client:
 			msg := messaging.Message{}
@@ -469,17 +468,19 @@ func (peerster *Peerster) Listen(origin Origin) {
 				go peerster.clientReceive(msg)
 			}
 		case Server:
+			// We start a goroutine for the processing step so we can keep reading from the socket
 			go peerster.serverReceive(buffer, *originAddr)
 		}
-		//}()
 	}
 }
 
+// Adds a new peer to the list of known peers, and adds it to the peerster's Want structure
 func (peerster *Peerster) registerNewPeer(address, peerIdentifier string, initialSeqId uint32) {
 	peerster.addToKnownPeers(address)
 	peerster.addToWantStruct(peerIdentifier, initialSeqId)
 }
 
+// Adds a private message to the list of received private messages
 func (peerster *Peerster) addToPrivateMessages(private messaging.PrivateMessage) {
 	peerster.ReceivedPrivateMessages.Mutex.Lock()
 	defer peerster.ReceivedPrivateMessages.Mutex.Unlock()
@@ -555,6 +556,7 @@ func (peerster *Peerster) addToKnownPeers(address string) {
 	peerster.KnownPeers = append(peerster.KnownPeers, address)
 }
 
+// Checks if a rumor has been received before using the origin and the sequence ID
 func (peerster *Peerster) hasReceivedRumor(origin string, seqId uint32) bool {
 	for i := range peerster.Want {
 		peer := peerster.Want[i]
@@ -591,6 +593,7 @@ func (peerster *Peerster) listPeers() {
 	}
 }
 
+// The method that handles sending messages over the network.
 func (peerster Peerster) sendToPeer(peer string, packet messaging.GossipPacket, blacklist []string) error {
 	for j := range blacklist {
 		if peer == blacklist[j] {
@@ -614,6 +617,7 @@ func (peerster Peerster) sendToPeer(peer string, packet messaging.GossipPacket, 
 	return nil
 }
 
+// Sends a GossipPacket to a random peer, and returns the peer the message was sent to.
 func (peerster *Peerster) sendToRandomPeer(packet messaging.GossipPacket, blacklist []string) (string, error) {
 	peer, err := peerster.chooseRandomPeer()
 	if err != nil {
@@ -638,6 +642,7 @@ func (peerster *Peerster) sendToKnownPeers(packet messaging.GossipPacket, blackl
 	return nil
 }
 
+// Starts the peerster anti-entropy process using an infinite while loop
 func (peerster *Peerster) AntiEntropy() {
 	go func() {
 		for {
