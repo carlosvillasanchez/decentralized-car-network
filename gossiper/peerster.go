@@ -202,7 +202,9 @@ func (peerster *Peerster) handleIncomingRumor(rumor *messaging.RumorMessage, ori
 	if *rumor == (messaging.RumorMessage{}) {
 		return ""
 	}
-	fmt.Printf("RUMOR origin %s from %s ID %v contents %s \n", rumor.Origin, originAddr.String(), rumor.ID, rumor.Text)
+	if rumor.Text != "" {
+		fmt.Printf("RUMOR origin %s from %s ID %v contents %s \n", rumor.Origin, originAddr.String(), rumor.ID, rumor.Text)
+	}
 	peerster.addToWantStruct(rumor.Origin, rumor.ID)
 	peerster.addToReceivedMessages(*rumor)
 	if rumor.Text != "" {
@@ -290,12 +292,10 @@ func (peerster *Peerster) handleIncomingStatusPacket(packet *messaging.StatusPac
 	}
 	// Printing for the automated tests
 	statusString := fmt.Sprintf("STATUS from %s ", originAddr.String())
-	//fmt.Printf("STATUS from %s ", originAddr.String())
 	for i := range packet.Want {
 		statusString += fmt.Sprintf("peer %s nextID %v ", packet.Want[i].Identifier, packet.Want[i].NextID)
-		//fmt.Printf("peer %s nextID %v ", packet.Want[i].Identifier, packet.Want[i].NextID)
 	}
-	fmt.Println(statusString)
+	//fmt.Println(statusString)
 	// End printing
 	//peerster.RumormongeringSessions.ResetTimer(originAddr.String()) //TODO verify that this makes sense
 	wantMap := createWantMap(peerster.Want)
@@ -364,12 +364,12 @@ func (peerster *Peerster) handleIncomingStatusPacket(packet *messaging.StatusPac
 		return
 	}
 
-	fmt.Printf("IN SYNC WITH %s \n", originAddr.String())
+	//fmt.Printf("IN SYNC WITH %s \n", originAddr.String())
 
 	session, ok := peerster.RumormongeringSessions.GetSession(originAddr.String())
 	if ok && session.Active && peerster.considerRumormongering() {
-		targetAddr := peerster.handleIncomingRumor(&session.Message, messaging.StringAddrToUDPAddr(peerster.GossipAddress), true)
-		fmt.Printf("FLIPPED COIN sending rumor to %s \n", targetAddr)
+		_ = peerster.handleIncomingRumor(&session.Message, messaging.StringAddrToUDPAddr(peerster.GossipAddress), true)
+		//fmt.Printf("FLIPPED COIN sending rumor to %s \n", targetAddr)
 	}
 	peerster.stopRumormongeringSession(originAddr.String())
 }
@@ -602,7 +602,7 @@ func (peerster Peerster) sendToPeer(peer string, packet messaging.GossipPacket, 
 	}
 
 	if packet.Rumor != nil {
-		fmt.Printf("MONGERING with %s \n", peer)
+		//fmt.Printf("MONGERING with %s \n", peer)
 	}
 	peerAddr := messaging.StringAddrToUDPAddr(peer)
 	packetBytes, err := protobuf.Encode(&packet)

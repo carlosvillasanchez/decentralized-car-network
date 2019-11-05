@@ -11,7 +11,7 @@ func (peerster *Peerster) handleNewMessage(w http.ResponseWriter, req *http.Requ
 	buffer := make([]byte, 1024)
 	n, err := req.Body.Read(buffer)
 	if err != nil {
-		fmt.Printf("Could not read message from frontend, reason: %s \n", err)
+		//fmt.Printf("Could not read message from frontend, reason: %s \n", err)
 	}
 	decoded := decodeJson(string(buffer[:n]))
 	text := decoded["message"].(string)
