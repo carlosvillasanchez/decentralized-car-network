@@ -3,6 +3,7 @@ package gossiper
 import (
 	"crypto"
 	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"io/ioutil"
 )
@@ -92,7 +93,7 @@ func (peerster *Peerster) indexReadFile(file []byte, fileName string) { //TODO r
 		MetafileHash: metafileHash,
 		FileSize:     0, // TODO filesize unnecessary? why did i add this
 	}
-	//fmt.Printf("MetafileHash: %s, ChunkLength: %v \n", hex.EncodeToString(metafileHash), len(chunks)) // RemoveTag
+	fmt.Printf("MetafileHash: %s, ChunkLength: %v \n", hex.EncodeToString(metafileHash), len(chunks)) // RemoveTag
 	peerster.SharedFiles.Mutex.Lock()
 	defer peerster.SharedFiles.Mutex.Unlock()
 	peerster.SharedFiles.Map[string(metafileHash)] = sharedFile

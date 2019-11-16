@@ -38,9 +38,20 @@
         <ul id="peer-list">
         </ul>
     </div>
+    <h2>Share/request files</h2>
     <form action="/file-share" enctype="multipart/form-data" method="post">
     <input id="file-input" type="file" value="Share file"/>
-    <input type="submit"/>
+    <input type="button" onclick="shareFile()" value="Share"/>
+    </form>
+    <ul id="shared-files-list">
+
+    </ul>
+    <p>Select a recipient above when you want to request a file</p>
+
+    <form action="/request-file" enctype="multipart/form-data" method="post">
+        <input id="filename-input" type="text" placeholder="filename"/>
+        <input id="metafile-input" type="text" placeholder="metafile-hash"/>
+        <input type="button" onclick="requestFile()" value="Request"/>
     </form>
 </div>
 </body>

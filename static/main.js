@@ -39,6 +39,21 @@ selectPrivateMsgRecipient = (id) => {
     document.getElementById("selected-recipient").innerHTML = "Selected recipient: " + id
 };
 
+shareFile = () => {
+    let fileInput = _getValueFromElementById("file-input");
+    fileName = fileInput.split(/(\\|\/)/g).pop();
+    console.log(fileName);
+    _httpPost(url + "/share-file", fileName)
+};
+
+requestFile = () => {
+    let filenameInput = _getValueFromElementById("filename-input");
+    let metafileInput = _getValueFromElementById("metafile-input");
+    console.log(filenameInput);
+    console.log(metafileInput);
+    _httpPost(url + "/request-file", JSON.stringify({fileName: filenameInput, metafileHash: metafileInput, destination: privateMessageTarget}))
+};
+
 _listMessages = (newMessages) => {
     for (let i in newMessages) {
         let message = newMessages[i];
@@ -106,6 +121,11 @@ _pollMessages = () => {
         }
 
         retrievedMessages = retrievedMessages.concat(newMessages);
+        if (retrievedMessages.length > 200) {
+            for (let i = 1; i < newMessages.length; i++) {
+                retrievedMessages.pop()
+            }
+        }
         _listMessages(newMessages)
     };
     setInterval(() => {

@@ -202,9 +202,9 @@ func (peerster *Peerster) handleIncomingRumor(rumor *messaging.RumorMessage, ori
 	if *rumor == (messaging.RumorMessage{}) {
 		return ""
 	}
-	if rumor.Text != "" {
-		fmt.Printf("RUMOR origin %s from %s ID %v contents %s \n", rumor.Origin, originAddr.String(), rumor.ID, rumor.Text)
-	}
+	//if rumor.Text != "" {
+	fmt.Printf("RUMOR origin %s from %s ID %v contents %s \n", rumor.Origin, originAddr.String(), rumor.ID, rumor.Text)
+	//}
 	peerster.addToWantStruct(rumor.Origin, rumor.ID)
 	peerster.addToReceivedMessages(*rumor)
 	if rumor.Text != "" {

@@ -42,6 +42,6 @@ func (peerster *Peerster) nextHopRoute(packet *messaging.GossipPacket, destinati
 			fmt.Printf("Unable to send DSHV routed message to %s, reason: %s \n", nextHopAddr, err)
 		}
 	} else {
-		fmt.Printf("Couldn't find %s in next hop table \n", destination)
+		//fmt.Printf("Couldn't find %s in next hop table \n", destination)
 	}
 }

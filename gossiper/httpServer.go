@@ -91,11 +91,39 @@ func (peerster *Peerster) handleHopTable(w http.ResponseWriter, req *http.Reques
 }
 
 func (peerster *Peerster) handleFileShare(w http.ResponseWriter, req *http.Request) {
-	err := req.ParseMultipartForm(0)
+	buffer := make([]byte, 1024)
+	n, err := req.Body.Read(buffer)
 	if err != nil {
-		fmt.Println(err)
+		//fmt.Printf("Could not read message from frontend, reason: %s \n", err)
 	}
-	fmt.Println(req.FormFile("file"))
+	peerster.shareFile(string(buffer[:n]))
+}
+
+func (peerster *Peerster) handleGetSharedFiles(w http.ResponseWriter, req *http.Request) {
+	sendValueAsJson(w, req, peerster.SharedFiles)
+}
+
+func (peerster *Peerster) handleRequestFile(w http.ResponseWriter, req *http.Request) {
+	buffer := make([]byte, 1024)
+	n, err := req.Body.Read(buffer)
+	if err != nil {
+		//fmt.Printf("Could not read message from frontend, reason: %s \n", err)
+	}
+	decoded := decodeJson(string(buffer[:n]))
+	println(decoded)
+	fmt.Println(decoded["fileName"], decoded["metafileHash"], decoded["destination"])
+	if decoded["fileName"] == nil || decoded["metafileHash"] == nil || decoded["destination"] == nil {
+		return
+	}
+	fileName := decoded["fileName"].(string)
+	metafileHash := decoded["metafileHash"].(string)
+	destination := decoded["destination"].(string)
+	message := messaging.Message{
+		Destination: &destination,
+		Request:     metafileHash,
+		File:        fileName,
+	}
+	peerster.clientReceive(message)
 }
 
 func (peerster *Peerster) ListenFrontend() {
@@ -103,11 +131,17 @@ func (peerster *Peerster) ListenFrontend() {
 	http.HandleFunc("/node", peerster.handlePeers)
 	http.HandleFunc("/id", peerster.handleId)
 	http.HandleFunc("/hop-table", peerster.handleHopTable)
-	http.HandleFunc("/file-share", peerster.handleFileShare)
+	http.HandleFunc("/share-file", peerster.handleFileShare)
+	http.HandleFunc("/get-shared-files", peerster.handleGetSharedFiles)
+	http.HandleFunc("/request-file", peerster.handleRequestFile)
 	http.Handle("/", http.FileServer(http.Dir("./static")))
 
 	err := http.ListenAndServe(":8080", nil)
 	if err != nil {
+		err := http.ListenAndServe(":8081", nil)
+		if err != nil {
+			fmt.Printf("QUOI?")
+		}
 		fmt.Printf("Could not listen to the frontend, reason: %s \n", err)
 	}
 }
