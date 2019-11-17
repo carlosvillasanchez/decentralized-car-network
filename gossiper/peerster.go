@@ -86,7 +86,6 @@ func (peerster *Peerster) clientReceive(message messaging.Message) {
 		destinationString = " dest " + *message.Destination
 	}
 	fmt.Println("CLIENT MESSAGE " + message.Text + destinationString)
-
 	if peerster.Simple {
 		packet := messaging.GossipPacket{Simple: peerster.createSimpleMessage(message.Text)}
 		err := peerster.sendToKnownPeers(packet, []string{})
@@ -116,6 +115,8 @@ func (peerster *Peerster) clientReceive(message messaging.Message) {
 			peerster.downloadData(*message.Destination, file)
 		} else if message.Destination == nil || *message.Destination == "" {
 			peerster.sendNewRumorMessage(message.Text)
+		} else if message.Keywords != nil {
+			peerster.searchForFiles(message.Keywords, message.Budget)
 		} else {
 			peerster.sendNewPrivateMessage(message)
 		}
@@ -412,6 +413,8 @@ func (peerster *Peerster) serverReceive(buffer []byte, originAddr net.UDPAddr) {
 		peerster.handleIncomingPrivateMessage(receivedPacket.Private, originAddr)
 		peerster.handleIncomingDataReply(receivedPacket.DataReply, originAddr)
 		peerster.handleIncomingDataRequest(receivedPacket.DataRequest, originAddr)
+		peerster.handleIncomingSearchRequest(receivedPacket.SearchRequest, originAddr)
+		//peerster.handleIncomingSearchReply(receivedPacket.SearchReply, originAddr)
 	} else {
 		fmt.Printf("SIMPLE MESSAGE origin %s from %s contents %s \n", receivedPacket.Simple.OriginalName, receivedPacket.Simple.RelayPeerAddr, receivedPacket.Simple.Contents)
 		blacklist := []string{addr} // we won't send a message to these peers

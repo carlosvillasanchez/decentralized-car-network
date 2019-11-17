@@ -7,15 +7,18 @@ import (
 	"github.com/tormey97/Peerster/messaging"
 	"log"
 	"net"
+	"strings"
 	//"github.com/TorsteinMeyer/Peerster/messaging"
 )
 
 type PeersterClient struct {
-	UIPort  string
-	msg     string
-	dest    string
-	file    string
-	request string
+	UIPort   string
+	msg      string
+	dest     string
+	file     string
+	request  string
+	keywords []string
+	budget   int
 }
 
 func (client PeersterClient) connect() (net.Conn, error) {
@@ -28,13 +31,18 @@ func createClient() PeersterClient {
 	dest := flag.String("dest", "", "destination for the private message")
 	file := flag.String("file", "", "file to share")
 	request := flag.String("request", "", "metafile hash of requested file")
+	keywords := flag.String("keywords", "", "keywords")
+	budget := flag.Int("budget", 0, "budget")
+
 	flag.Parse()
 	return PeersterClient{
-		UIPort:  *UIPort,
-		msg:     *msg,
-		dest:    *dest,
-		file:    *file,
-		request: *request,
+		UIPort:   *UIPort,
+		msg:      *msg,
+		dest:     *dest,
+		file:     *file,
+		request:  *request,
+		keywords: strings.Split(*keywords, ","),
+		budget:   *budget,
 	}
 }
 
@@ -49,6 +57,8 @@ func main() {
 		Destination: &client.dest,
 		File:        client.file,
 		Request:     client.request,
+		Budget:      client.budget,
+		Keywords:    client.keywords,
 	}
 	encoded, err := protobuf.Encode(&msg)
 	if err != nil {
