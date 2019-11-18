@@ -9,7 +9,16 @@ import (
 
 // Sends a request to search for files in other nodes with keywords
 func (peerster *Peerster) searchForFiles(keywords []string, budget int) {
-
+	request := messaging.SearchRequest{
+		Origin:   peerster.Name,
+		Budget:   uint64(budget),
+		Keywords: keywords,
+	}
+	packet := messaging.GossipPacket{SearchRequest: &request}
+	_, err := peerster.sendToRandomPeer(packet, []string{})
+	if err != nil {
+		fmt.Printf("Couldn't send SearchRequest to random peer, reason: %s \n", err)
+	}
 }
 
 func (peerster *Peerster) handleIncomingSearchRequest(request *messaging.SearchRequest, originAddr net.UDPAddr) {
@@ -24,6 +33,7 @@ func (peerster *Peerster) handleIncomingSearchRequest(request *messaging.SearchR
 		HopLimit:    10,
 		Results:     peerster.createSearchResults(files),
 	}
+	fmt.Println(reply.Results)
 	packet := messaging.GossipPacket{
 		SearchReply: &reply,
 	}
@@ -122,4 +132,8 @@ func (peerster *Peerster) createSearchResults(foundFiles []SharedFile) []*messag
 		results = append(results, &result)
 	}
 	return results
+}
+
+func (peerster *Peerster) handleIncomingSearchReply(reply *messaging.SearchReply, originAddr net.UDPAddr) {
+
 }

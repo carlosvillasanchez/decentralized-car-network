@@ -22,16 +22,17 @@ _httpGet = (url, body, callback) => {
     req.send(body)
 };
 
-url = "http://localhost:8080";
+url = window.location.href;
+console.log(url);
 
 sendMessage = () => {
     let messageInput = _getValueFromElementById("message-input");
-    _httpPost(url + "/message", JSON.stringify({message: messageInput, destination: privateMessageTarget}));
+    _httpPost(url + "message", JSON.stringify({message: messageInput, destination: privateMessageTarget}));
 };
 
 registerNode = () => {
     let nodeInput = _getValueFromElementById("node-input");
-    _httpPost(url + "/node", nodeInput);
+    _httpPost(url + "node", nodeInput);
 };
 
 selectPrivateMsgRecipient = (id) => {
@@ -43,7 +44,7 @@ shareFile = () => {
     let fileInput = _getValueFromElementById("file-input");
     fileName = fileInput.split(/(\\|\/)/g).pop();
     console.log(fileName);
-    _httpPost(url + "/share-file", fileName)
+    _httpPost(url + "share-file", fileName)
 };
 
 requestFile = () => {
@@ -51,7 +52,7 @@ requestFile = () => {
     let metafileInput = _getValueFromElementById("metafile-input");
     console.log(filenameInput);
     console.log(metafileInput);
-    _httpPost(url + "/request-file", JSON.stringify({fileName: filenameInput, metafileHash: metafileInput, destination: privateMessageTarget}))
+    _httpPost(url + "request-file", JSON.stringify({fileName: filenameInput, metafileHash: metafileInput, destination: privateMessageTarget}))
 };
 
 _listMessages = (newMessages) => {
@@ -129,9 +130,9 @@ _pollMessages = () => {
         _listMessages(newMessages)
     };
     setInterval(() => {
-        _httpGet(url + "/message", [], _addMessages);
-        _httpGet(url + "/hop-table", [], _listHopTable);
-        _httpGet(url + "/node", [], _listPeers);
+        _httpGet(url + "message", [], _addMessages);
+        _httpGet(url + "hop-table", [], _listHopTable);
+        _httpGet(url + "node", [], _listPeers);
     }, 1000)
 
 };
@@ -141,7 +142,7 @@ _setId = (response) => {
     document.getElementById("title").innerHTML = "Peerster ID: " + response;
 };
 _getId = () => {
-    _httpGet(url + "/id", [], _setId);
+    _httpGet(url + "id", [], _setId);
 };
 
 _getId();

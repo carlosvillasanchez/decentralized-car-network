@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/tormey97/Peerster/messaging"
 	"net/http"
+	"strconv"
 )
 
 func (peerster *Peerster) handleNewMessage(w http.ResponseWriter, req *http.Request) {
@@ -136,12 +137,14 @@ func (peerster *Peerster) ListenFrontend() {
 	http.HandleFunc("/request-file", peerster.handleRequestFile)
 	http.Handle("/", http.FileServer(http.Dir("./static")))
 
-	err := http.ListenAndServe(":8080", nil)
-	if err != nil {
-		err := http.ListenAndServe(":8081", nil)
-		if err != nil {
-			fmt.Printf("QUOI?")
+	frontendPort := 8080
+	success := false
+	for !success {
+		err := http.ListenAndServe(":"+strconv.Itoa(frontendPort), nil)
+		if err == nil {
+			success = true
+		} else {
+			frontendPort++
 		}
-		fmt.Printf("Could not listen to the frontend, reason: %s \n", err)
 	}
 }
