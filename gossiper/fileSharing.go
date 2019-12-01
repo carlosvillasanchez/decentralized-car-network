@@ -133,7 +133,6 @@ func (peerster *Peerster) downloadData(peerIdentifier string, previousDownloadSe
 				peerster.FileChunks.Mutex.Lock()
 				peerster.FileChunks.Map[string(reply.HashValue)] = reply.Data
 				peerster.FileChunks.Mutex.Unlock()
-				// if youre reviewing this and this isnt thread safe i will buy you a beer
 			}
 			peerster.DownloadingFiles.setValue(index, fileBeingDownloaded)
 

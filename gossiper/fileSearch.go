@@ -3,9 +3,130 @@ package gossiper
 import (
 	"fmt"
 	"github.com/tormey97/Peerster/messaging"
+	"github.com/tormey97/Peerster/utils"
 	"net"
 	"strings"
+	"sync"
+	"time"
 )
+
+const INITIAL_BUDGET = 2
+const MATCH_THRESHOLD = 2
+
+type FileSearch struct {
+	Keywords        []string
+	Budget          int
+	BudgetSpecified bool
+	MatchCount      int
+}
+
+type FileSearchSessions struct {
+	Array []FileSearch
+	Mutex sync.RWMutex
+}
+
+func (sessions *FileSearchSessions) AddSession(keywords []string, budget int) {
+	found, _ := sessions.FindSession(keywords)
+	if found { //TODO may not be necessary
+		return
+	}
+	budgetSpecified := budget == 0
+	if budgetSpecified {
+		budget = INITIAL_BUDGET
+	}
+	session := FileSearch{
+		Keywords:        keywords,
+		Budget:          budget,
+		BudgetSpecified: budgetSpecified,
+		MatchCount:      0,
+	}
+	sessions.Mutex.Lock()
+	defer sessions.Mutex.Unlock()
+	sessions.Array = append(sessions.Array, session)
+}
+
+func (sessions *FileSearchSessions) RemoveSession(keywords []string) {
+	found, i := sessions.FindSession(keywords)
+	if !found {
+		return
+	}
+	sessions.Mutex.Lock()
+	defer sessions.Mutex.Unlock()
+	sessions.Array = append(sessions.Array[:i], sessions.Array[i+1:]...)
+}
+
+func (sessions *FileSearchSessions) FindSession(keywords []string) (bool, int) {
+	sessions.Mutex.RLock()
+	defer sessions.Mutex.RUnlock()
+	for i := range sessions.Array {
+		session := sessions.Array[i]
+		if messaging.SliceEqual(keywords, session.Keywords) {
+			return true, i
+		}
+	}
+	return false, 0
+}
+
+func (sessions *FileSearchSessions) FindMatchingSessions(reply messaging.SearchReply) {
+	sessions.Mutex.RLock()
+	for i := range sessions.Array {
+		session := sessions.Array[i]
+		matchedFilenames := []string{}
+		for j := range reply.Results {
+			result := reply.Results[j]
+			for x := range session.Keywords {
+				if strings.Contains(result.FileName, session.Keywords[x]) { // TODO need to use REGEXP here? or what?
+					if !messaging.SliceContains(result.FileName, matchedFilenames) {
+						matchedFilenames = append(matchedFilenames, result.FileName)
+						sessions.Mutex.RUnlock()
+						sessions.Mutex.Lock()
+						session.MatchCount++
+						sessions.Array[i] = session
+						sessions.Mutex.Unlock()
+						sessions.Mutex.RLock()
+					}
+					break
+				}
+			}
+		}
+	}
+}
+
+type FileMatches struct {
+	Map   map[string][]messaging.SearchResult
+	Mutex sync.RWMutex
+}
+
+func (fileMatches *FileMatches) isFullyMatched(filename string) bool {
+	fileMatches.Mutex.RLock()
+	defer fileMatches.Mutex.RUnlock()
+	file, ok := fileMatches.Map[filename]
+	if !ok {
+		utils.DebugPrintln("Tried to check match for nonexistent file", filename)
+		return false
+	}
+	foundChunks := []uint64{}
+	for i := range file {
+		result := file[i]
+		for j := range result.ChunkMap {
+			alreadyFound := false
+			for x := range foundChunks {
+				if foundChunks[x] == result.ChunkMap[j] {
+					alreadyFound = true
+					break
+				}
+			}
+			if alreadyFound {
+				break
+			}
+			foundChunks = append(foundChunks, result.ChunkMap[j])
+		}
+	}
+	if len(foundChunks) == 99999999 { // TODO FILESIZE
+		return true
+	}
+	return false
+}
 
 // Sends a request to search for files in other nodes with keywords
 func (peerster *Peerster) searchForFiles(keywords []string, budget int) {
@@ -21,8 +142,42 @@ func (peerster *Peerster) searchForFiles(keywords []string, budget int) {
 	}
 }
 
+// Tries to add the search request to the list of recent search requests. If it's already in there, returns false and
+// doesn't add it - otherwise, starts a 0.5 second timer that will remove it and returns true.
+func (peerster *Peerster) addToRecentSearchRequests(request *messaging.SearchRequest) bool {
+	peerster.RecentSearchRequests.Mutex.RLock()
+	for i := range peerster.RecentSearchRequests.Array {
+		recentRequest := peerster.RecentSearchRequests.Array[i]
+		if recentRequest.Origin == request.Origin && messaging.SliceEqual(request.Keywords, recentRequest.Keywords) {
+			peerster.RecentSearchRequests.Mutex.RUnlock()
+			utils.DebugPrintln("Rejected search request")
+			return false
+		}
+	}
+	peerster.RecentSearchRequests.Mutex.RUnlock()
+	peerster.RecentSearchRequests.Mutex.Lock()
+	peerster.RecentSearchRequests.Array = append(peerster.RecentSearchRequests.Array, *request)
+	peerster.RecentSearchRequests.Mutex.Unlock()
+	go func() {
+		time.Sleep(500 * time.Millisecond)
+		peerster.RecentSearchRequests.Mutex.RLock()
+		for i := range peerster.RecentSearchRequests.Array {
+			recentRequest := peerster.RecentSearchRequests.Array[i]
+			if recentRequest.Origin == request.Origin && messaging.SliceEqual(request.Keywords, recentRequest.Keywords) {
+				peerster.RecentSearchRequests.Mutex.RUnlock()
+				peerster.RecentSearchRequests.Mutex.Lock()
+				peerster.RecentSearchRequests.Array = append(peerster.RecentSearchRequests.Array[:i], peerster.RecentSearchRequests.Array[i+1:]...)
+				peerster.RecentSearchRequests.Mutex.Unlock()
+				return
+			}
+		}
+		peerster.RecentSearchRequests.Mutex.RUnlock()
+	}()
+	return true
+}
+
 func (peerster *Peerster) handleIncomingSearchRequest(request *messaging.SearchRequest, originAddr net.UDPAddr) {
-	if request == nil {
+	if request == nil || !peerster.addToRecentSearchRequests(request) {
 		return
 	}
 	// TODO handle budget
@@ -135,5 +290,7 @@ func (peerster *Peerster) createSearchResults(foundFiles []SharedFile) []*messag
 }
 
 func (peerster *Peerster) handleIncomingSearchReply(reply *messaging.SearchReply, originAddr net.UDPAddr) {
+	// We find the session that belongs to this reply, if any. Then, we should add a match to the session somehow. The match will simply be the searchreply.
+	peerster.FileSearchSessions.FindMatchingSessions(*reply)
 
 }

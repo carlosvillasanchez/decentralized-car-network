@@ -70,6 +70,13 @@ func createPeerster() gossiper.Peerster {
 			Map:   map[string]gossiper.FileBeingDownloaded{},
 			Mutex: sync.RWMutex{},
 		},
+		RecentSearchRequests: struct {
+			Array []messaging.SearchRequest
+			Mutex sync.RWMutex
+		}{
+			Array: []messaging.SearchRequest{},
+			Mutex: sync.RWMutex{},
+		},
 	}
 }
 

@@ -46,3 +46,24 @@ func StringAddrToUDPAddr(addr string) net.UDPAddr {
 		Zone: "",
 	}
 }
+
+func SliceEqual(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i, v := range a {
+		if v != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func SliceContains(a string, b []string) bool {
+	for i := range b {
+		if b[i] == a {
+			return true
+		}
+	}
+	return false
+}

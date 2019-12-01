@@ -53,7 +53,12 @@ type Peerster struct {
 		Map   map[string][]byte
 		Mutex sync.RWMutex
 	}
-	DownloadingFiles DownloadingFiles
+	RecentSearchRequests struct {
+		Array []messaging.SearchRequest
+		Mutex sync.RWMutex
+	}
+	FileSearchSessions
+	DownloadingFiles
 }
 
 func (peerster *Peerster) String() string {
