@@ -77,6 +77,14 @@ func createPeerster() gossiper.Peerster {
 			Array: []messaging.SearchRequest{},
 			Mutex: sync.RWMutex{},
 		},
+		FileMatches: gossiper.FileMatches{
+			Map:   map[string][]gossiper.FileMatch{},
+			Mutex: sync.RWMutex{},
+		},
+		FileSearchSessions: gossiper.FileSearchSessions{
+			Array: []gossiper.FileSearch{},
+			Mutex: sync.RWMutex{},
+		},
 	}
 }
 

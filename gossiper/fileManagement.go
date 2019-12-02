@@ -92,6 +92,7 @@ func (peerster *Peerster) indexReadFile(file []byte, fileName string) { //TODO r
 		Metafile:     metafile,
 		MetafileHash: metafileHash,
 		FileSize:     0, // TODO filesize unnecessary? why did i add this
+		FileName:     fileName,
 	}
 	fmt.Printf("MetafileHash: %s, ChunkLength: %v \n", hex.EncodeToString(metafileHash), len(chunks)) // RemoveTag
 	peerster.SharedFiles.Mutex.Lock()

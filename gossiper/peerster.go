@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/dedis/protobuf"
 	"github.com/tormey97/Peerster/messaging"
+	"github.com/tormey97/Peerster/utils"
 	"log"
 	"math/rand"
 	"net"
@@ -59,6 +60,7 @@ type Peerster struct {
 	}
 	FileSearchSessions
 	DownloadingFiles
+	FileMatches
 }
 
 func (peerster *Peerster) String() string {
@@ -100,7 +102,7 @@ func (peerster *Peerster) clientReceive(message messaging.Message) {
 	} else {
 		if message.File != "" && message.Request == "" {
 			peerster.shareFile(message.File)
-		} else if message.Request != "" && message.File != "" && message.Destination != nil {
+		} else if message.Request != "" && message.File != "" && message.Destination != nil && *message.Destination != "" {
 			// We decode the hexadecimal metafile request
 			dst := make([]byte, hex.DecodedLen(len([]byte(message.Request))))
 			_, err := hex.Decode(dst, []byte(message.Request))
@@ -116,9 +118,47 @@ func (peerster *Peerster) clientReceive(message messaging.Message) {
 				DownloadedData: nil,
 				FileName:       message.File,
 			}
-			fmt.Printf("DOWNLOADING metafile of %s from %s \n", file.FileName, *message.Destination)
-			peerster.downloadData(*message.Destination, file)
+			peerster.downloadData([]string{*message.Destination}, file)
+		} else if (message.Destination == nil || *message.Destination == "") && message.File != "" && message.Request != "" {
+			peerster.FileMatches.Mutex.RLock()
+			decodedRequest, _ := hex.DecodeString(message.Request)
+			_, ok := peerster.FileMatches.Map[string(decodedRequest)]
+			for i := range peerster.FileMatches.Map {
+				fmt.Println([]byte(i), []byte(message.Request), "????????", message.Request)
+			}
+			peerster.FileMatches.Mutex.RUnlock()
+
+			if !ok {
+				utils.DebugPrintln(" we don't have a search done for that file, no match.")
+				return // TODO we don't have a search done for that file, no match.
+			}
+			if !peerster.FileMatches.isFullyMatched(decodedRequest) {
+				utils.DebugPrintln("We arent done with the search yet/file isnt fully matched")
+				return // TODO We arent done with the search yet/file isnt fully matched
+			}
+
+			// If we pass the checks, we need to perform a file download, but with a dynamic destination.
+			// First step: We create an order in which we will downlaod the chunks..
+			order, err := peerster.FileMatches.createDownloadChain(decodedRequest)
+			utils.DebugPrintln("WE JUST DID", order)
+			if err != nil {
+				utils.DebugPrintln(err)
+				return
+			}
+			dst := make([]byte, hex.DecodedLen(len([]byte(message.Request))))
+			_, _ = hex.Decode(dst, []byte(message.Request))
+			file := FileBeingDownloaded{
+				MetafileHash:   dst,
+				Channel:        make(chan messaging.DataReply),
+				CurrentChunk:   0,
+				Metafile:       nil,
+				DownloadedData: nil,
+				FileName:       message.File,
+			}
+			peerster.downloadData(order, file)
+
 		} else if message.Keywords != nil {
+			utils.DebugPrintln("SEARCHING")
 			peerster.searchForFiles(message.Keywords, message.Budget)
 		} else if message.Destination == nil || *message.Destination == "" {
 			peerster.sendNewRumorMessage(message.Text)

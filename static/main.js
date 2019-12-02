@@ -68,6 +68,11 @@ _listMessages = (newMessages) => {
         let span = document.createElement("span");
         let privateString = "";
         if (message["ID"] === 0) {
+            console.log(privateMessages)
+            if (privateMessages.includes(message["Text"])) {
+                continue
+            }
+            privateMessages.push(message["Text"])
             privateString = "PRIVATE: "
         }
         span.innerHTML = privateString + message["Text"];

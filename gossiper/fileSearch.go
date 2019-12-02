@@ -1,10 +1,13 @@
 package gossiper
 
 import (
+	"errors"
 	"fmt"
 	"github.com/tormey97/Peerster/messaging"
 	"github.com/tormey97/Peerster/utils"
+	"math/rand"
 	"net"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -12,6 +15,7 @@ import (
 
 const INITIAL_BUDGET = 2
 const MATCH_THRESHOLD = 2
+const BUDGET_THRESHOLD = 32
 
 type FileSearch struct {
 	Keywords        []string
@@ -67,8 +71,12 @@ func (sessions *FileSearchSessions) FindSession(keywords []string) (bool, int) {
 	return false, 0
 }
 
-func (sessions *FileSearchSessions) FindMatchingSessions(reply messaging.SearchReply) {
+// Finds the active search sessions for which there is a match. If there is a match, we should check
+// if the threshold has been reached - if so we stop, if not we keep searching? Or not?
+// AH only if the session did not have a specified budget.
+func (sessions *FileSearchSessions) FindMatchingSessions(reply messaging.SearchReply) []int {
 	sessions.Mutex.RLock()
+	foundSessions := []int{}
 	for i := range sessions.Array {
 		session := sessions.Array[i]
 		matchedFilenames := []string{}
@@ -78,31 +86,93 @@ func (sessions *FileSearchSessions) FindMatchingSessions(reply messaging.SearchR
 				if strings.Contains(result.FileName, session.Keywords[x]) { // TODO need to use REGEXP here? or what?
 					if !messaging.SliceContains(result.FileName, matchedFilenames) {
 						matchedFilenames = append(matchedFilenames, result.FileName)
-						sessions.Mutex.RUnlock()
-						sessions.Mutex.Lock()
-						session.MatchCount++
-						sessions.Array[i] = session
-						sessions.Mutex.Unlock()
-						sessions.Mutex.RLock()
 					}
 					break
 				}
 			}
 		}
 	}
+	return foundSessions
+}
+
+type FileMatch struct {
+	messaging.SearchResult
+	Origin string
 }
 
 type FileMatches struct {
-	Map   map[string][]messaging.SearchResult
+	Map   map[string][]FileMatch
 	Mutex sync.RWMutex
 }
 
-func (fileMatches *FileMatches) isFullyMatched(filename string) bool {
+func (fileMatches *FileMatches) addResults(reply messaging.SearchReply) {
+	results := reply.Results
+	for i := range results {
+		result := results[i]
+		hash := result.MetafileHash
+		chunkString := ""
+		for j := range result.ChunkMap {
+			chunkString += strconv.Itoa(int(result.ChunkMap[j]))
+			if j < len(result.ChunkMap)-1 {
+				chunkString += ","
+			}
+		}
+		fmt.Printf("FOUND match %s at %s metafile=%s chunks=%s \n", result.FileName, reply.Origin, result.MetafileHash, chunkString) //TODO arguments
+		fileMatches.Mutex.RLock()
+		_, ok := fileMatches.Map[string(hash)]
+		fileMatches.Mutex.RUnlock()
+		fileMatches.Mutex.Lock()
+		utils.DebugPrintln(string(hash), "WHAT")
+		if !ok {
+			fileMatches.Map[string(hash)] = []FileMatch{{
+				SearchResult: *result,
+				Origin:       reply.Origin,
+			}}
+		} else {
+			fileMatches.Map[string(hash)] = append(fileMatches.Map[string(hash)], FileMatch{
+				SearchResult: *result,
+				Origin:       reply.Origin,
+			})
+		}
+		utils.DebugPrintln("FILEMATCHES MAP: ", fileMatches.Map[string(hash)][0])
+		fileMatches.Mutex.Unlock()
+	}
+}
+
+func (fileMatches *FileMatches) createDownloadChain(metafileHash []byte) ([]string, error) {
+	if !fileMatches.isFullyMatched(metafileHash) {
+		return nil, errors.New("file wasn't fully matched")
+	}
+	fileMatches.Mutex.RLock()
+	results := fileMatches.Map[string(metafileHash)]
+	fileMatches.Mutex.RUnlock()
+	chunkCount := results[0].ChunkCount
+	order := []string{}
+	for i := 0; i < int(chunkCount); i++ {
+		utils.DebugPrintln(i, "CHUNKI")
+
+		// Find all nodes that have this chunk, then pick one at random.
+		nodesHavingChunk := []string{}
+		for j := range results {
+			utils.DebugPrintln(results[j].Origin, results[j].FileName, results[j].Origin)
+			for x := range results[j].ChunkMap {
+				if results[j].ChunkMap[x] == uint64(i) {
+					nodesHavingChunk = append(nodesHavingChunk, results[j].Origin)
+				}
+			}
+		}
+		chosenNode := nodesHavingChunk[rand.Intn(len(nodesHavingChunk))]
+		order = append(order, chosenNode)
+	}
+	return order, nil
+}
+
+func (fileMatches *FileMatches) isFullyMatched(metafileHash []byte) bool {
 	fileMatches.Mutex.RLock()
 	defer fileMatches.Mutex.RUnlock()
-	file, ok := fileMatches.Map[filename]
+	file, ok := fileMatches.Map[string(metafileHash)]
 	if !ok {
-		utils.DebugPrintln("Tried to check match for nonexistent file", filename)
+		utils.DebugPrintln("Tried to check match for nonexistent file", string(metafileHash))
 		return false
 	}
 	foundChunks := []uint64{}
@@ -122,7 +192,8 @@ func (fileMatches *FileMatches) isFullyMatched(filename string) bool {
 			foundChunks = append(foundChunks, result.ChunkMap[j])
 		}
 	}
-	if len(foundChunks) == 99999999 { // TODO FILESIZE
+	utils.DebugPrintln("LENGTH THING: ", len(foundChunks), int(file[0].ChunkCount))
+	if len(foundChunks) == int(file[0].ChunkCount) { // TODO FILESIZE
 		return true
 	}
 	return false
@@ -135,6 +206,7 @@ func (peerster *Peerster) searchForFiles(keywords []string, budget int) {
 		Budget:   uint64(budget),
 		Keywords: keywords,
 	}
+	peerster.FileSearchSessions.AddSession(keywords, budget)
 	packet := messaging.GossipPacket{SearchRequest: &request}
 	_, err := peerster.sendToRandomPeer(packet, []string{})
 	if err != nil {
@@ -188,7 +260,7 @@ func (peerster *Peerster) handleIncomingSearchRequest(request *messaging.SearchR
 		HopLimit:    10,
 		Results:     peerster.createSearchResults(files),
 	}
-	fmt.Println(reply.Results)
+	utils.DebugPrintln(reply.Results)
 	packet := messaging.GossipPacket{
 		SearchReply: &reply,
 	}
@@ -238,14 +310,18 @@ func (peerster *Peerster) searchInLocalFiles(keywords []string) []SharedFile {
 	defer peerster.SharedFiles.Mutex.RUnlock()
 	foundFiles := []SharedFile{}
 	for i := range peerster.SharedFiles.Map {
+		utils.DebugPrintln(i, "I")
 		file := peerster.SharedFiles.Map[i]
 		for j := range keywords {
+			utils.DebugPrintln(j, "J")
+			utils.DebugPrintln(file.FileName, keywords[j], strings.Contains(file.FileName, keywords[j]))
 			if strings.Contains(file.FileName, keywords[j]) { // TODO need to use REGEXP here? or what?
 				foundFiles = append(foundFiles, file)
 				break
 			}
 		}
 	}
+	utils.DebugPrintln(foundFiles, "FOUNDFILES")
 	return foundFiles
 }
 
@@ -278,6 +354,7 @@ func (peerster *Peerster) createSearchResults(foundFiles []SharedFile) []*messag
 	for i := range foundFiles {
 		file := foundFiles[i]
 		foundChunks := peerster.findChunksOfFile(file.MetafileHash)
+		utils.DebugPrintln(i)
 		result := messaging.SearchResult{
 			FileName:     file.FileName,
 			MetafileHash: file.MetafileHash,
@@ -291,6 +368,15 @@ func (peerster *Peerster) createSearchResults(foundFiles []SharedFile) []*messag
 
 func (peerster *Peerster) handleIncomingSearchReply(reply *messaging.SearchReply, originAddr net.UDPAddr) {
 	// We find the session that belongs to this reply, if any. Then, we should add a match to the session somehow. The match will simply be the searchreply.
+	// If we receive enough matches (MATCH_THRESHOLD) then we stop searching...?
+	// Only if we're doing the doubling stuff, yaeh?
+	if reply == nil {
+		return
+	}
 	peerster.FileSearchSessions.FindMatchingSessions(*reply)
+	peerster.FileMatches.addResults(*reply)
 
+	// Now, we need ot know if it was a specified budget or not. If it was, we stop.
+	// Otherwise, we check if we have enough matches (2) or if our budget is too high (32). Then we stop.
+	// Otherwise, we need to search again with double budget.
 }

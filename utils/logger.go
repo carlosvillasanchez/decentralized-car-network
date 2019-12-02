@@ -2,7 +2,7 @@ package utils
 
 import "fmt"
 
-const DEBUG = true
+const DEBUG = false
 
 func DebugPrintf(format string, a ...interface{}) {
 	if DEBUG {

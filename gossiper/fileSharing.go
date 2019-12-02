@@ -100,11 +100,19 @@ func (peerster *Peerster) sendDataRequest(destination string, hash []byte) {
 }
 
 // Starts a download of a specific chunk (or a metafile)
-func (peerster *Peerster) downloadData(peerIdentifier string, previousDownloadSession FileBeingDownloaded) {
+func (peerster *Peerster) downloadData(peerIdentifiers []string, previousDownloadSession FileBeingDownloaded) {
 	hash := previousDownloadSession.getHashToSend()
+	peerIdentifier := peerIdentifiers[0]
+	if len(peerIdentifiers) == 1 {
+		peerIdentifier = peerIdentifiers[0]
+	} else {
+		peerIdentifier = peerIdentifiers[previousDownloadSession.CurrentChunk]
+	}
 	index := string(hash)
 	if previousDownloadSession.Metafile != nil {
 		fmt.Printf("DOWNLOADING %s chunk %v from %s \n", previousDownloadSession.FileName, previousDownloadSession.CurrentChunk+1, peerIdentifier)
+	} else {
+		fmt.Printf("DOWNLOADING metafile of %s from %s \n", previousDownloadSession.FileName, peerIdentifier)
 	}
 	peerster.DownloadingFiles.setValue(index, previousDownloadSession)
 	peerster.sendDataRequest(peerIdentifier, hash)
@@ -155,7 +163,7 @@ func (peerster *Peerster) downloadData(peerIdentifier string, previousDownloadSe
 			// At this point, we either request the same hash over again (because of timeout)
 			// or we request the next hash (because we incremented currentChunk,
 			// getHashToSend will return the next hash)
-			peerster.downloadData(peerIdentifier, value)
+			peerster.downloadData(peerIdentifiers, value)
 		}
 	}()
 }
