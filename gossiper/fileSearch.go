@@ -1,6 +1,7 @@
 package gossiper
 
 import (
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"github.com/tormey97/Peerster/messaging"
@@ -13,9 +14,9 @@ import (
 	"time"
 )
 
-const INITIAL_BUDGET = 2
-const MATCH_THRESHOLD = 2
-const BUDGET_THRESHOLD = 32
+const InitialBudget = 2
+const MatchThreshold = 2
+const BudgetThreshold = 32
 
 type FileSearch struct {
 	Keywords        []string
@@ -29,14 +30,14 @@ type FileSearchSessions struct {
 	Mutex sync.RWMutex
 }
 
-func (sessions *FileSearchSessions) AddSession(keywords []string, budget int) {
-	found, _ := sessions.FindSession(keywords)
+func (sessions *FileSearchSessions) AddSession(keywords []string, budget int) (int, bool) {
+	found, i := sessions.FindSession(keywords)
 	if found { //TODO may not be necessary
-		return
+		return i, false
 	}
-	budgetSpecified := budget == 0
-	if budgetSpecified {
-		budget = INITIAL_BUDGET
+	budgetSpecified := budget != 0
+	if !budgetSpecified {
+		budget = InitialBudget
 	}
 	session := FileSearch{
 		Keywords:        keywords,
@@ -44,24 +45,30 @@ func (sessions *FileSearchSessions) AddSession(keywords []string, budget int) {
 		BudgetSpecified: budgetSpecified,
 		MatchCount:      0,
 	}
-	sessions.Mutex.Lock()
-	defer sessions.Mutex.Unlock()
+	//sessions.Mutex.Lock()
+	//defer sessions.Mutex.Unlock()
 	sessions.Array = append(sessions.Array, session)
+	return -1, true
 }
 
 func (sessions *FileSearchSessions) RemoveSession(keywords []string) {
 	found, i := sessions.FindSession(keywords)
+	utils.DebugPrintln("WANT TO REMOVE SESSION", keywords, i, found)
 	if !found {
 		return
 	}
-	sessions.Mutex.Lock()
-	defer sessions.Mutex.Unlock()
+	//sessions.Mutex.Lock()
+	//defer sessions.Mutex.Unlock()
 	sessions.Array = append(sessions.Array[:i], sessions.Array[i+1:]...)
+	utils.DebugPrintln("AFTER REMOVE", sessions.Array)
+	for i := range sessions.Array {
+		utils.DebugPrintln(sessions.Array[i], "WE AFTER")
+	}
 }
 
 func (sessions *FileSearchSessions) FindSession(keywords []string) (bool, int) {
-	sessions.Mutex.RLock()
-	defer sessions.Mutex.RUnlock()
+	//sessions.Mutex.RLock()
+	//defer sessions.Mutex.RUnlock()
 	for i := range sessions.Array {
 		session := sessions.Array[i]
 		if messaging.SliceEqual(keywords, session.Keywords) {
@@ -78,9 +85,11 @@ func (sessions *FileSearchSessions) FindMatchingSessions(reply messaging.SearchR
 	sessions.Mutex.RLock()
 	foundSessions := []int{}
 	for i := range sessions.Array {
+		utils.DebugPrintln("I IN RESULTS", i)
 		session := sessions.Array[i]
 		matchedFilenames := []string{}
 		for j := range reply.Results {
+			utils.DebugPrintln(j, "J IN RESULTS")
 			result := reply.Results[j]
 			for x := range session.Keywords {
 				if strings.Contains(result.FileName, session.Keywords[x]) { // TODO need to use REGEXP here? or what?
@@ -91,6 +100,10 @@ func (sessions *FileSearchSessions) FindMatchingSessions(reply messaging.SearchR
 				}
 			}
 		}
+		if len(matchedFilenames) > 0 {
+			foundSessions = append(foundSessions, i)
+		}
+
 	}
 	return foundSessions
 }
@@ -105,25 +118,28 @@ type FileMatches struct {
 	Mutex sync.RWMutex
 }
 
-func (fileMatches *FileMatches) addResults(reply messaging.SearchReply) {
+func (fileMatches *FileMatches) addResults(reply messaging.SearchReply) int {
 	results := reply.Results
+	matchCount := 0
 	for i := range results {
 		result := results[i]
 		hash := result.MetafileHash
+		isMatchedBefore := fileMatches.isFullyMatched(hash)
 		chunkString := ""
 		for j := range result.ChunkMap {
-			chunkString += strconv.Itoa(int(result.ChunkMap[j]))
+			chunkString += strconv.Itoa(int(result.ChunkMap[j]) + 1)
 			if j < len(result.ChunkMap)-1 {
 				chunkString += ","
 			}
 		}
-		fmt.Printf("FOUND match %s at %s metafile=%s chunks=%s \n", result.FileName, reply.Origin, result.MetafileHash, chunkString) //TODO arguments
+		hashToPrint := hex.EncodeToString(result.MetafileHash)
+		fmt.Printf("FOUND match %s at %s metafile=%s chunks=%s \n", result.FileName, reply.Origin, hashToPrint, chunkString) //TODO arguments
 		fileMatches.Mutex.RLock()
 		_, ok := fileMatches.Map[string(hash)]
 		fileMatches.Mutex.RUnlock()
 		fileMatches.Mutex.Lock()
-		utils.DebugPrintln(string(hash), "WHAT")
 		if !ok {
+			utils.DebugPrintln("WE SHOULD BE ADDING NOW", result.FileName)
 			fileMatches.Map[string(hash)] = []FileMatch{{
 				SearchResult: *result,
 				Origin:       reply.Origin,
@@ -134,9 +150,16 @@ func (fileMatches *FileMatches) addResults(reply messaging.SearchReply) {
 				Origin:       reply.Origin,
 			})
 		}
-		utils.DebugPrintln("FILEMATCHES MAP: ", fileMatches.Map[string(hash)][0])
+		for i := range fileMatches.Map {
+			utils.DebugPrintln(fileMatches.Map[i], "FM MAP")
+		}
 		fileMatches.Mutex.Unlock()
+		isMatchedAfter := fileMatches.isFullyMatched(hash)
+		if isMatchedAfter && !isMatchedBefore {
+			matchCount++
+		}
 	}
+	return matchCount
 }
 
 func (fileMatches *FileMatches) createDownloadChain(metafileHash []byte) ([]string, error) {
@@ -168,11 +191,15 @@ func (fileMatches *FileMatches) createDownloadChain(metafileHash []byte) ([]stri
 }
 
 func (fileMatches *FileMatches) isFullyMatched(metafileHash []byte) bool {
+	utils.DebugPrintln("DE", string(metafileHash))
 	fileMatches.Mutex.RLock()
 	defer fileMatches.Mutex.RUnlock()
 	file, ok := fileMatches.Map[string(metafileHash)]
 	if !ok {
 		utils.DebugPrintln("Tried to check match for nonexistent file", string(metafileHash))
+		for i := range fileMatches.Map {
+			utils.DebugPrintln(i, "THIS STUF")
+		}
 		return false
 	}
 	foundChunks := []uint64{}
@@ -201,17 +228,47 @@ func (fileMatches *FileMatches) isFullyMatched(metafileHash []byte) bool {
 
 // Sends a request to search for files in other nodes with keywords
 func (peerster *Peerster) searchForFiles(keywords []string, budget int) {
+	utils.DebugPrintln("called")
 	request := messaging.SearchRequest{
 		Origin:   peerster.Name,
 		Budget:   uint64(budget),
 		Keywords: keywords,
 	}
-	peerster.FileSearchSessions.AddSession(keywords, budget)
-	packet := messaging.GossipPacket{SearchRequest: &request}
-	_, err := peerster.sendToRandomPeer(packet, []string{})
-	if err != nil {
-		fmt.Printf("Couldn't send SearchRequest to random peer, reason: %s \n", err)
+	idx, ok := peerster.FileSearchSessions.AddSession(keywords, budget)
+	utils.DebugPrintln(idx, ok)
+	if !ok {
+		// Session already there, so we just update the budget
+		//peerster.FileSearchSessions.Mutex.Lock()
+		existingSession := peerster.FileSearchSessions.Array[idx]
+		if budget == 0 {
+			budget = InitialBudget
+		}
+		existingSession.Budget = budget
+		peerster.FileSearchSessions.Array[idx] = existingSession
+		//peerster.FileSearchSessions.Mutex.Unlock()
 	}
+
+	_, idx = peerster.FileSearchSessions.FindSession(keywords)
+	utils.DebugPrintln("WE HERE???", peerster.FileSearchSessions.Array[idx].BudgetSpecified, peerster.FileSearchSessions.Array[idx].Budget)
+
+	if !peerster.FileSearchSessions.Array[idx].BudgetSpecified && peerster.FileSearchSessions.Array[idx].Budget > 0 && peerster.FileSearchSessions.Array[idx].Budget < BudgetThreshold {
+		utils.DebugPrintln("QUEST CE QUE CEST")
+		go func() {
+			utils.DebugPrintln("Go startedd")
+			time.Sleep(1 * time.Second)
+			utils.DebugPrintln("Go ended")
+			if len(peerster.FileSearchSessions.Array) <= idx {
+				utils.DebugPrintln("WE HAVE THAT PROBLEM")
+				return
+			}
+			peerster.searchForFiles(keywords, peerster.FileSearchSessions.Array[idx].Budget*2)
+			utils.DebugPrintln("wtfGo ended")
+
+		}()
+	} else {
+		//peerster.RemoveSession(keywords)
+	}
+	peerster.distributeSearchRequest(&request)
 }
 
 // Tries to add the search request to the list of recent search requests. If it's already in there, returns false and
@@ -231,7 +288,9 @@ func (peerster *Peerster) addToRecentSearchRequests(request *messaging.SearchReq
 	peerster.RecentSearchRequests.Array = append(peerster.RecentSearchRequests.Array, *request)
 	peerster.RecentSearchRequests.Mutex.Unlock()
 	go func() {
+		utils.DebugPrintln("STARTING SEARCH REQUEST COUNTDOWN")
 		time.Sleep(500 * time.Millisecond)
+		utils.DebugPrintln("FINISHED SQ COOLDOWN")
 		peerster.RecentSearchRequests.Mutex.RLock()
 		for i := range peerster.RecentSearchRequests.Array {
 			recentRequest := peerster.RecentSearchRequests.Array[i]
@@ -249,18 +308,19 @@ func (peerster *Peerster) addToRecentSearchRequests(request *messaging.SearchReq
 }
 
 func (peerster *Peerster) handleIncomingSearchRequest(request *messaging.SearchRequest, originAddr net.UDPAddr) {
-	if request == nil || !peerster.addToRecentSearchRequests(request) {
+	if request == nil || !peerster.addToRecentSearchRequests(request) || request.Origin == peerster.Name {
 		return
 	}
 	// TODO handle budget
 	files := peerster.searchInLocalFiles(request.Keywords)
+	utils.DebugPrintln("THE ORIGIN IS ", request.Origin)
 	reply := messaging.SearchReply{
 		Origin:      peerster.Name,
 		Destination: request.Origin,
 		HopLimit:    10,
 		Results:     peerster.createSearchResults(files),
 	}
-	utils.DebugPrintln(reply.Results)
+	utils.DebugPrintln(reply.Results, "THIS IS THE RESULT; SHOULD SEND BACK NOW")
 	packet := messaging.GossipPacket{
 		SearchReply: &reply,
 	}
@@ -271,15 +331,22 @@ func (peerster *Peerster) handleIncomingSearchRequest(request *messaging.SearchR
 // Distributes the search request evenly among the peerster's neighbors using the Budget value.
 // TODO make sure your definition of neighbor is correct (could be nexthop table with hop distance 1)
 func (peerster *Peerster) distributeSearchRequest(request *messaging.SearchRequest) {
-	request.Budget--
 	knownPeers := peerster.KnownPeers
 	packetsToSend := map[string]messaging.GossipPacket{}
+
 	if request.Budget <= 0 {
 		return
 	}
-	for request.Budget > 0 {
+	if len(knownPeers) == 0 {
+		utils.DebugPrintln("KNOWNPEERS 0 LEN")
+		return
+	}
+	remainingBudget := int(request.Budget)
+	remainingBudget--
+	for remainingBudget > 0 {
+		utils.DebugPrintln(remainingBudget, "REMBUDG")
 		for i := range knownPeers {
-			request.Budget--
+			remainingBudget--
 			packet, ok := packetsToSend[knownPeers[i]]
 			if !ok {
 				newRequest := request
@@ -290,12 +357,14 @@ func (peerster *Peerster) distributeSearchRequest(request *messaging.SearchReque
 				packet.SearchRequest.Budget++
 				packetsToSend[knownPeers[i]] = packet
 			}
-			if request.Budget == 0 {
+			if remainingBudget == 0 {
 				break
 			}
 		}
 	}
+	utils.DebugPrintln(packetsToSend, "WE PACKETIN")
 	for i, v := range packetsToSend {
+		utils.DebugPrintln(i, v, "WE SENDING OVER")
 		err := peerster.sendToPeer(i, v, []string{})
 		if err != nil {
 			fmt.Printf("Couldn't distribute searchreply, reason: %s \n", err)
@@ -373,9 +442,38 @@ func (peerster *Peerster) handleIncomingSearchReply(reply *messaging.SearchReply
 	if reply == nil {
 		return
 	}
-	peerster.FileSearchSessions.FindMatchingSessions(*reply)
-	peerster.FileMatches.addResults(*reply)
+	if reply.Destination != peerster.Name {
+		utils.DebugPrintln("WE NEXTHOPROUTING TO ", reply.Destination)
+		reply.HopLimit--
+		if reply.HopLimit == 0 {
+			return
+		}
+		peerster.nextHopRoute(&messaging.GossipPacket{SearchReply: reply}, reply.Destination)
+		return
+	}
+	sessions := peerster.FileSearchSessions.FindMatchingSessions(*reply)
 
+	utils.DebugPrintln(sessions, "THIS IMPORTANT", len(sessions))
+	matchCount := peerster.FileMatches.addResults(*reply)
+	for i := range sessions {
+		session := peerster.FileSearchSessions.Array[sessions[i]]
+		session.MatchCount += matchCount
+		utils.DebugPrintln("WE HERE NOW AS WELL MATCHCOUNT", session.MatchCount, matchCount)
+		peerster.FileSearchSessions.Array[sessions[i]] = session
+		if session.BudgetSpecified {
+			utils.DebugPrintln("We just finished search 1")
+			// We continue
+			peerster.RemoveSession(session.Keywords)
+		} else if session.MatchCount >= MatchThreshold || session.Budget >= BudgetThreshold {
+			// We continue
+			utils.DebugPrintln("We just finished search 2", session.MatchCount, session.Budget)
+			if session.MatchCount >= MatchThreshold {
+				fmt.Println("SEARCH FINISHED")
+			}
+			peerster.RemoveSession(session.Keywords)
+		}
+
+	}
 	// Now, we need ot know if it was a specified budget or not. If it was, we stop.
 	// Otherwise, we check if we have enough matches (2) or if our budget is too high (32). Then we stop.
 	// Otherwise, we need to search again with double budget.

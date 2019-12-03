@@ -124,7 +124,7 @@ func (peerster *Peerster) clientReceive(message messaging.Message) {
 			decodedRequest, _ := hex.DecodeString(message.Request)
 			_, ok := peerster.FileMatches.Map[string(decodedRequest)]
 			for i := range peerster.FileMatches.Map {
-				fmt.Println([]byte(i), []byte(message.Request), "????????", message.Request)
+				utils.DebugPrintln([]byte(i), []byte(message.Request), "????????", message.Request)
 			}
 			peerster.FileMatches.Mutex.RUnlock()
 
@@ -249,7 +249,7 @@ func (peerster *Peerster) handleIncomingRumor(rumor *messaging.RumorMessage, ori
 		return ""
 	}
 	//if rumor.Text != "" {
-	fmt.Printf("RUMOR origin %s from %s ID %v contents %s \n", rumor.Origin, originAddr.String(), rumor.ID, rumor.Text)
+	//fmt.Printf("RUMOR origin %s from %s ID %v contents %s \n", rumor.Origin, originAddr.String(), rumor.ID, rumor.Text)
 	//}
 	peerster.addToWantStruct(rumor.Origin, rumor.ID)
 	peerster.addToReceivedMessages(*rumor)
