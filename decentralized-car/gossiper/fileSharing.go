@@ -114,16 +114,16 @@ func (peerster *Peerster) downloadData(peerIdentifiers []string, previousDownloa
 	} else {
 		fmt.Printf("DOWNLOADING metafile of %s from %s \n", previousDownloadSession.FileName, peerIdentifier)
 	}
-	peerster.DownloadingFiles.setValue(index, previousDownloadSession)
+	DownloadingFiles.setValue(index, previousDownloadSession)
 	peerster.sendDataRequest(peerIdentifier, hash)
 	go func() {
-		value, ok := peerster.DownloadingFiles.getValue(index)
+		value, ok := DownloadingFiles.getValue(index)
 		if !ok {
 			return
 		}
 		select {
 		case reply := <-value.Channel:
-			fileBeingDownloaded, ok := peerster.DownloadingFiles.getValue(index)
+			fileBeingDownloaded, ok := DownloadingFiles.getValue(index)
 			if !ok {
 				// We aren't downloading this file, so why did we receive it? Who knows..
 				// TODO is that a possible case? ??? ??? ????
@@ -142,23 +142,23 @@ func (peerster *Peerster) downloadData(peerIdentifiers []string, previousDownloa
 				peerster.FileChunks.Map[string(reply.HashValue)] = reply.Data
 				peerster.FileChunks.Mutex.Unlock()
 			}
-			peerster.DownloadingFiles.setValue(index, fileBeingDownloaded)
+			DownloadingFiles.setValue(index, fileBeingDownloaded)
 
 		case <-time.After(5 * time.Second):
 			//fmt.Printf("DownloadingFiles session timeout with hash %v \n", hash)
 		}
-		value, ok = peerster.DownloadingFiles.getValue(index)
+		value, ok = DownloadingFiles.getValue(index)
 		if !ok {
 			//fmt.Printf("Warning: was unable to find the file download session when it should exist. Probably a bug \n")
 		}
-		if peerster.DownloadingFiles.isFullyDownloaded(index) {
+		if DownloadingFiles.isFullyDownloaded(index) {
 			err := reconstructAndSaveFile(value)
 			if err != nil {
 				fmt.Printf("Warning: Could not reconstruct/save file, reason: %s \n", err)
 			} else {
 				peerster.indexReconstructedFile(value)
 			}
-			peerster.DownloadingFiles.deleteValue(index)
+			DownloadingFiles.deleteValue(index)
 		} else {
 			// At this point, we either request the same hash over again (because of timeout)
 			// or we request the next hash (because we incremented currentChunk,
@@ -181,7 +181,7 @@ func (peerster *Peerster) handleIncomingDataReply(reply *messaging.DataReply, or
 		index := string(reply.HashValue)
 		// We send a message through the session's channel to trigger starting a new one with the next request
 		// or if its finished, reconstruct/save the file
-		peerster.DownloadingFiles.confirmReceivedDataReply(index, *reply)
+		DownloadingFiles.confirmReceivedDataReply(index, *reply)
 	} else if reply.HopLimit == 0 {
 		return
 	} else {
