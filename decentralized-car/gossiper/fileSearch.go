@@ -234,34 +234,34 @@ func (peerster *Peerster) searchForFiles(keywords []string, budget int) {
 		Budget:   uint64(budget),
 		Keywords: keywords,
 	}
-	idx, ok := peerster.FileSearchSessions.AddSession(keywords, budget)
+	idx, ok := FileSearchSessions.AddSession(keywords, budget)
 	utils.DebugPrintln(idx, ok)
 	if !ok {
 		// Session already there, so we just update the budget
 		//peerster.FileSearchSessions.Mutex.Lock()
-		existingSession := peerster.FileSearchSessions.Array[idx]
+		existingSession := FileSearchSessions.Array[idx]
 		if budget == 0 {
 			budget = InitialBudget
 		}
 		existingSession.Budget = budget
-		peerster.FileSearchSessions.Array[idx] = existingSession
+		FileSearchSessions.Array[idx] = existingSession
 		//peerster.FileSearchSessions.Mutex.Unlock()
 	}
 
-	_, idx = peerster.FileSearchSessions.FindSession(keywords)
-	utils.DebugPrintln("WE HERE???", peerster.FileSearchSessions.Array[idx].BudgetSpecified, peerster.FileSearchSessions.Array[idx].Budget)
+	_, idx = FileSearchSessions.FindSession(keywords)
+	utils.DebugPrintln("WE HERE???", FileSearchSessions.Array[idx].BudgetSpecified, FileSearchSessions.Array[idx].Budget)
 
-	if !peerster.FileSearchSessions.Array[idx].BudgetSpecified && peerster.FileSearchSessions.Array[idx].Budget > 0 && peerster.FileSearchSessions.Array[idx].Budget < BudgetThreshold {
+	if !FileSearchSessions.Array[idx].BudgetSpecified && FileSearchSessions.Array[idx].Budget > 0 && FileSearchSessions.Array[idx].Budget < BudgetThreshold {
 		utils.DebugPrintln("QUEST CE QUE CEST")
 		go func() {
 			utils.DebugPrintln("Go startedd")
 			time.Sleep(1 * time.Second)
 			utils.DebugPrintln("Go ended")
-			if len(peerster.FileSearchSessions.Array) <= idx {
+			if len(FileSearchSessions.Array) <= idx {
 				utils.DebugPrintln("WE HAVE THAT PROBLEM")
 				return
 			}
-			peerster.searchForFiles(keywords, peerster.FileSearchSessions.Array[idx].Budget*2)
+			peerster.searchForFiles(keywords, FileSearchSessions.Array[idx].Budget*2)
 			utils.DebugPrintln("wtfGo ended")
 
 		}()
@@ -451,15 +451,15 @@ func (peerster *Peerster) handleIncomingSearchReply(reply *messaging.SearchReply
 		peerster.nextHopRoute(&messaging.GossipPacket{SearchReply: reply}, reply.Destination)
 		return
 	}
-	sessions := peerster.FileSearchSessions.FindMatchingSessions(*reply)
+	sessions := FileSearchSessions.FindMatchingSessions(*reply)
 
 	utils.DebugPrintln(sessions, "THIS IMPORTANT", len(sessions))
-	matchCount := peerster.FileMatches.addResults(*reply)
+	matchCount := FileMatches.addResults(*reply)
 	for i := range sessions {
-		session := peerster.FileSearchSessions.Array[sessions[i]]
+		session := FileSearchSessions.Array[sessions[i]]
 		session.MatchCount += matchCount
 		utils.DebugPrintln("WE HERE NOW AS WELL MATCHCOUNT", session.MatchCount, matchCount)
-		peerster.FileSearchSessions.Array[sessions[i]] = session
+		FileSearchSessions.Array[sessions[i]] = session
 		if session.BudgetSpecified {
 			utils.DebugPrintln("We just finished search 1")
 			// We continue
