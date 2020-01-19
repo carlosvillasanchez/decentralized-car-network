@@ -2,8 +2,8 @@ package decentralized_car
 
 import (
 	"flag"
-	"github.com/tormey97/Peerster/gossiper"
-	"github.com/tormey97/Peerster/messaging"
+	"github.com/tormey97/decentralized-car-network/decentralized-car/gossiper"
+	"github.com/tormey97/decentralized-car-network/decentralized-car/messaging"
 	"math/rand"
 	"net"
 	"strings"
@@ -17,10 +17,21 @@ const (
 	Client Origin = iota
 	Server
 )
-
+const emptyMap = [][]string{
+	{"N", "N", "N", "N","N","N","N","N","N"},
+	{"N", "N", "N", "N","N","N","N","N","N"},
+	{"N", "N", "N", "N","N","N","N","N","N"},	
+	{"N", "N", "N", "N","N","N","N","N","N"},	
+	{"N", "N", "N", "N","N","N","N","N","N"},	
+	{"N", "N", "N", "N","N","N","N","N","N"},	
+	{"N", "N", "N", "N","N","N","N","N","N"},	
+	{"N", "N", "N", "N","N","N","N","N","N"},	
+	{"N", "N", "N", "N","N","N","N","N","N"},			
+}
 func createPeerster() gossiper.Peerster {
 	UIPort := flag.String("UIPort", "8080", "the port the client uses to communicate with peerster")
 	gossipAddr := flag.String("gossipAddr", "127.0.0.1:5000", "the address of the peerster")
+	map := flag.String("map", "[127.0.0.1:5000]", "Matrix representing the map")
 	name := flag.String("name", "nodeA", "the Name of the node")
 	peers := flag.String("peers", "", "known peers")
 	simple := flag.Bool("simple", false, "Simple mode")

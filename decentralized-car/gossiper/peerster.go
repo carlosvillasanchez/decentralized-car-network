@@ -4,15 +4,16 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/dedis/protobuf"
-	"github.com/tormey97/Peerster/messaging"
-	"github.com/tormey97/Peerster/utils"
 	"log"
 	"math/rand"
 	"net"
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/dedis/protobuf"
+	"github.com/tormey97/decentralized-car-network/decentralized-car/messaging"
+	"github.com/tormey97/decentralized-car-network/utils"
 )
 
 type Origin int

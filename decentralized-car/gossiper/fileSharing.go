@@ -2,10 +2,11 @@ package gossiper
 
 import (
 	"fmt"
-	"github.com/tormey97/Peerster/messaging"
 	"net"
 	"sync"
 	"time"
+
+	"github.com/tormey97/decentralized-car-network/decentralized-car/messaging"
 )
 
 const HashSize = 32

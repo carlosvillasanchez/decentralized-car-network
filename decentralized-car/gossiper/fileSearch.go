@@ -4,14 +4,15 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/tormey97/Peerster/messaging"
-	"github.com/tormey97/Peerster/utils"
 	"math/rand"
 	"net"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/tormey97/decentralized-car-network/utils"
+	messaging "github.com/tormey97/decentralized-car-network/utils"
 )
 
 const InitialBudget = 2
