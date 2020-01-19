@@ -1,101 +1,33 @@
-package main
+package decentralized_car_network
 
 import (
-	"flag"
-	"github.com/tormey97/Peerster/gossiper"
-	"github.com/tormey97/Peerster/messaging"
-	"math/rand"
-	"net"
-	"strings"
+	"github.com/tormey97/decentralized-car-network/simulator"
 	"sync"
-	"time"
 )
 
-type Origin int
+/*
+This is the centralized server that simulates the world the cars find themselves in.
+Handles:
+Creation of the map
+Management of map updates, these updates will be transmitted to the cars that can "see" the updates via the network
+Manages the zones
+Creation of cars
+Starting the simulation
+*/
 
-const (
-	Client Origin = iota
-	Server
-)
-
-func createPeerster() gossiper.Peerster {
-	UIPort := flag.String("UIPort", "8080", "the port the client uses to communicate with peerster")
-	gossipAddr := flag.String("gossipAddr", "127.0.0.1:5000", "the address of the peerster")
-	name := flag.String("name", "nodeA", "the Name of the node")
-	peers := flag.String("peers", "", "known peers")
-	simple := flag.Bool("simple", false, "Simple mode")
-	antiEntropy := flag.Int("antiEntropy", 10, "Anti entropy timer")
-	rTimer := flag.Int("rtimer", 0, "Route rumor message interval timer")
-	flag.Parse()
-	peersList := []string{}
-	if *peers != "" {
-		peersList = strings.Split(*peers, ",")
-	}
-	return gossiper.Peerster{
-		UIPort:           *UIPort,
-		GossipAddress:    *gossipAddr,
-		KnownPeers:       peersList,
-		Name:             *name,
-		Simple:           *simple,
-		AntiEntropyTimer: *antiEntropy,
-		RumormongeringSessions: messaging.AtomicRumormongeringSessionMap{
-			RumormongeringSessions: map[string]messaging.RumormongeringSession{},
-			Mutex:                  sync.RWMutex{},
-		},
-		ReceivedMessages: struct {
-			Map   map[string][]messaging.RumorMessage
-			Mutex sync.RWMutex
-		}{Map: map[string][]messaging.RumorMessage{}, Mutex: sync.RWMutex{}},
-		ReceivedPrivateMessages: struct {
-			Map   map[string][]messaging.PrivateMessage
-			Mutex sync.RWMutex
-		}{Map: map[string][]messaging.PrivateMessage{}, Mutex: sync.RWMutex{}},
-		MsgSeqNumber: 1,
-		Want:         []messaging.PeerStatus{},
-		Conn:         net.UDPConn{},
-		RTimer:       *rTimer,
-		NextHopTable: struct {
-			Map   map[string]string
-			Mutex sync.RWMutex
-		}{Map: map[string]string{}, Mutex: sync.RWMutex{}},
-		SharedFiles: struct {
-			Map   map[string]gossiper.SharedFile
-			Mutex sync.RWMutex
-		}{Map: map[string]gossiper.SharedFile{}, Mutex: sync.RWMutex{}},
-		FileChunks: struct {
-			Map   map[string][]byte
-			Mutex sync.RWMutex
-		}{Map: map[string][]byte{}, Mutex: sync.RWMutex{}},
-		DownloadingFiles: gossiper.DownloadingFiles{
-			Map:   map[string]gossiper.FileBeingDownloaded{},
-			Mutex: sync.RWMutex{},
-		},
-		RecentSearchRequests: struct {
-			Array []messaging.SearchRequest
-			Mutex sync.RWMutex
-		}{
-			Array: []messaging.SearchRequest{},
-			Mutex: sync.RWMutex{},
-		},
-		FileMatches: gossiper.FileMatches{
-			Map:   map[string][]gossiper.FileMatch{},
-			Mutex: sync.RWMutex{},
-		},
-		FileSearchSessions: gossiper.FileSearchSessions{
-			Array: []gossiper.FileSearch{},
-			Mutex: sync.RWMutex{},
-		},
-	}
-}
-
-func init() {
-	rand.Seed(time.Now().UTC().UnixNano())
-}
+/*
+Flow of program: Client creates map -> specifies amount of cars -> sends command to backend to start program ->
+backend sets the map, generates the cars (starts the car programs with initial positions), cars immediately start driving
+*/
 func main() {
-	peerster := createPeerster()
-	go peerster.Listen(gossiper.Server)
-	go peerster.ListenFrontend()
-	peerster.AntiEntropy()
-	peerster.SendRouteMessages()
-	peerster.Listen(gossiper.Client)
+	carNetworkSimulator := simulator.CarNetworkSimulator{
+		CarsInNetwork: simulator.CarsInNetwork{
+			RWMutex: sync.RWMutex{},
+			Map:     map[string]simulator.Car{},
+		},
+		SimulatedMap: simulator.SimulatedMap{
+			RWMutex: sync.RWMutex{},
+			Grid:    [9][9]simulator.Square{},
+		},
+	}
 }
