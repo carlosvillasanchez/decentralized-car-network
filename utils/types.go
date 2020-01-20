@@ -1,4 +1,4 @@
-package simulator
+package utils
 
 import (
 	"net"
@@ -22,13 +22,12 @@ type CarsInNetwork struct {
 }
 
 type Square struct { // One grid/square in the map
-	Type string
-	Position
+	Type string // Type of the square, parking spot, accident, normal etc
 }
 
 type SimulatedMap struct { // The entire simulated map
 	sync.RWMutex
-	Grid [9][9]Square
+	Grid [9][9]Square // Matrix representing the whole map
 }
 
 type CarNetworkSimulator struct {

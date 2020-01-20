@@ -5,8 +5,7 @@ import (
 	"net"
 	"strconv"
 	"strings"
-
-	"github.com/tormey97/decentralized-car-network/simulator"
+	// "github.com/tormey97/decentralized-car-network/simulator"
 )
 
 const MaxBufferSize = 65536
@@ -48,17 +47,19 @@ func StringAddrToUDPAddr(addr string) net.UDPAddr {
 		Zone: "",
 	}
 }
-func stringToCarMap(string) SimulatedMap {
-	var squareType simulator.Square
+func stringToCarMap(stringFlag string) *SimulatedMap {
+	var squareType Square
 	// make([]int, 0, 5)
-	var carMap = simulator.Grid[9][9]
+	var carMap SimulatedMap
+	// var carMap = Grid
 	for i := 0; i < 9; i++ {
-		stringSplit = strings.SplitN(value, ",", 10)
+		stringSplit := strings.SplitN(stringFlag, ",", 10)
 		for j, square := range stringSplit {
 			squareType.Type = square
-			carMap[i][j] = squareType
+			carMap.Grid[i][j] = squareType
 		}
 	}
+	return &carMap
 }
 func SliceEqual(a, b []string) bool {
 	if len(a) != len(b) {

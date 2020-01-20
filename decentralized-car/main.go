@@ -31,7 +31,7 @@ const emptyMap = [][]string{
 func createPeerster() gossiper.Peerster {
 	UIPort := flag.String("UIPort", "8080", "the port the client uses to communicate with peerster")
 	gossipAddr := flag.String("gossipAddr", "127.0.0.1:5000", "the address of the peerster")
-	map := flag.String("map", "[127.0.0.1:5000]", "Matrix representing the map")
+	map := flag.String("map", emptyMap, "Matrix representing the map")
 	name := flag.String("name", "nodeA", "the Name of the node")
 	peers := flag.String("peers", "", "known peers")
 	simple := flag.Bool("simple", false, "Simple mode")
