@@ -2,6 +2,7 @@ package gossiper
 
 import (
 	"container/heap"
+	"fmt"
 	"github.com/tormey97/decentralized-car-network/simulator"
 )
 
@@ -89,7 +90,7 @@ func toPathfindingNode(pos simulator.Position) pathfindingNode {
 
 // need a struct for the detected cost for each checked node
 // [][]x, y, cost
-func createPath(
+func CreatePath(
 	simulatedMap *simulator.SimulatedMap,
 	startPos, endPos simulator.Position,
 	obstructions []simulator.Position) []simulator.Position {
@@ -104,15 +105,26 @@ func createPath(
 		closedSet.Push(currentNode)
 		neighbors := getNeighbors(currentNode, width, height)
 		for _, neighbor := range neighbors {
-			//nodeType := simulatedMap.Grid[neighbor.X][neighbor.Y].Type
+			nodeType := simulatedMap.Grid[neighbor.X][neighbor.Y].Type
 			neighborNode := distances[neighbor.X][neighbor.Y]
 			if currentNode.cost+1 < neighborNode.cost {
 				neighborNode.cost = currentNode.cost + 1
+				neighborNode.predecessor = currentNode.Position
 			}
 			if !openSet.Contains(currentNode) && !closedSet.Contains(currentNode) {
 				heap.Push(&openSet, currentNode)
 			}
+			if neighborNode.Position == endPos {
+				pathFound = true
+			}
 		}
 	}
+	if pathFound {
+
+	}
 	return nil
+}
+
+func main() {
+	fmt.Printf("Eh")
 }
