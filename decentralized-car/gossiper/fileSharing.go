@@ -6,7 +6,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/tormey97/Car/messaging"
+	"github.com/tormey97/decentralized-car-network/decentralized-car/messaging"
+	"github.com/tormey97/decentralized-car-network/utils"
 )
 
 const HashSize = 32
@@ -97,7 +98,7 @@ func (peerster *Peerster) sendDataRequest(destination string, hash []byte) {
 		HashValue:   hash,
 	}
 	// TODO start a "download session", marked by the metafile hash + destination?
-	peerster.handleIncomingDataRequest(&request, messaging.StringAddrToUDPAddr(peerster.GossipAddress))
+	peerster.handleIncomingDataRequest(&request, utils.StringAddrToUDPAddr(peerster.GossipAddress))
 }
 
 // Starts a download of a specific chunk (or a metafile)
@@ -224,7 +225,7 @@ func (peerster *Peerster) handleIncomingDataRequest(request *messaging.DataReque
 			Data:        data,
 		}
 		// We send the DataReply into our incoming data reply handler, sending it into the network as normal
-		peerster.handleIncomingDataReply(reply, messaging.StringAddrToUDPAddr(peerster.GossipAddress))
+		peerster.handleIncomingDataReply(reply, utils.StringAddrToUDPAddr(peerster.GossipAddress))
 	} else if request.HopLimit == 0 {
 		return
 	} else {

@@ -2,6 +2,8 @@ package messaging
 
 import (
 	"sync"
+
+	"github.com/tormey97/decentralized-car-network/utils"
 )
 
 type SimpleMessage struct {
@@ -20,6 +22,7 @@ type PrivateMessage struct {
 
 type GossipPacket struct {
 	Simple        *SimpleMessage
+	Area          *AreaMessage
 	Rumor         *RumorMessage
 	Status        *StatusPacket
 	Private       *PrivateMessage
@@ -44,20 +47,21 @@ type Message struct {
 	Keywords    []string
 }
 type AreaMessage struct {
-	Origin   string // Name of the car
-	ID       uint32 // ID of the message, cars only analyze the message with the highest ID
-	Position Position
+	Origin string // Name of the car
+	// ID       uint32 // ID of the message, cars only analyze the message with the highest ID
+	Position utils.Position
 }
 type FreeSpotMessage struct {
 	Origin          string // Name of the Announcing car
 	ID              uint32
-	ParkingPosition Position // Position of the parking spot
-	Taken           bool     // Wheter the spot is occuped already or not
+	ParkingPosition utils.Position // Position of the parking spot
+	Taken           bool           // Wheter the spot is occuped already or not
 }
-type Position struct {
-	X int // X position of the car
-	Y int // Y position of the car
-}
+
+// type Position struct {
+// 	X int // X position of the car
+// 	Y int // Y position of the car
+// }
 type PeerStatus struct {
 	Identifier string
 	NextID     uint32
@@ -66,14 +70,15 @@ type PeerStatus struct {
 type StatusPacket struct {
 	Want []PeerStatus
 }
-type Square struct { // One grid/square in the map
-	Type string // Type of the square, parking spot, accident, normal etc
-}
 
-type SimulatedMap struct { // The entire simulated map
-	sync.RWMutex
-	Grid [9][9]Square // Matrix representing the whole map
-}
+// type Square struct { // One grid/square in the map
+// 	Type string // Type of the square, parking spot, accident, normal etc
+// }
+
+// type SimulatedMap struct { // The entire simulated map
+// 	sync.RWMutex
+// 	Grid [9][9]Square // Matrix representing the whole map
+// }
 type DataRequest struct {
 	Origin      string
 	Destination string

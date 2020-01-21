@@ -1,7 +1,6 @@
 package gossiper
 
 import (
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"log"
@@ -32,7 +31,11 @@ type Peerster struct {
 	AntiEntropyTimer int
 	Want             []messaging.PeerStatus
 	MsgSeqNumber     uint32
-	CarMap           utils.SimulatedMap
+	CarMap           *utils.SimulatedMap
+	CarPosition      utils.Position
+	EndCarP          utils.Position
+	PathCar          []utils.Position
+	BroadcastTimer   int
 	ReceivedMessages struct { //TODO is there a nice way to make a generic mutex map type, instead of having to do this every time?
 		Map   map[string][]messaging.RumorMessage
 		Mutex sync.RWMutex
@@ -54,10 +57,6 @@ type Peerster struct {
 	}
 	FileChunks struct {
 		Map   map[string][]byte
-		Mutex sync.RWMutex
-	}
-	RecentSearchRequests struct {
-		Array []messaging.SearchRequest
 		Mutex sync.RWMutex
 	}
 	DownloadingFiles
@@ -88,84 +87,7 @@ func (peerster *Peerster) createConnection(origin Origin) (net.UDPConn, error) {
 }
 
 func (peerster *Peerster) clientReceive(message messaging.Message) {
-	destinationString := ""
-	if message.Destination != nil && *message.Destination != "" {
-		destinationString = " dest " + *message.Destination
-	}
-	fmt.Println("CLIENT MESSAGE " + message.Text + destinationString)
-	if peerster.Simple {
-		packet := messaging.GossipPacket{Simple: peerster.createSimpleMessage(message.Text)}
-		err := peerster.sendToKnownPeers(packet, []string{})
-		if err != nil {
-			fmt.Printf("Error: could not send receivedPacket from client, reason: %s \n", err)
-		}
-	} else {
-		if message.File != "" && message.Request == "" {
-			peerster.shareFile(message.File)
-		} else if message.Request != "" && message.File != "" && message.Destination != nil && *message.Destination != "" {
-			// We decode the hexadecimal metafile request
-			dst := make([]byte, hex.DecodedLen(len([]byte(message.Request))))
-			_, err := hex.Decode(dst, []byte(message.Request))
-			if err != nil {
-				fmt.Printf("Warning: Invalid input %s from client when requesting file \n", message.Request)
-				return
-			}
-			file := FileBeingDownloaded{
-				MetafileHash:   dst,
-				Channel:        make(chan messaging.DataReply),
-				CurrentChunk:   0,
-				Metafile:       nil,
-				DownloadedData: nil,
-				FileName:       message.File,
-			}
-			peerster.downloadData([]string{*message.Destination}, file)
-		} else if (message.Destination == nil || *message.Destination == "") && message.File != "" && message.Request != "" {
-			peerster.FileMatches.Mutex.RLock()
-			decodedRequest, _ := hex.DecodeString(message.Request)
-			_, ok := peerster.FileMatches.Map[string(decodedRequest)]
-			for i := range peerster.FileMatches.Map {
-				utils.DebugPrintln([]byte(i), []byte(message.Request), "????????", message.Request)
-			}
-			peerster.FileMatches.Mutex.RUnlock()
 
-			if !ok {
-				utils.DebugPrintln(" we don't have a search done for that file, no match.")
-				return // TODO we don't have a search done for that file, no match.
-			}
-			if !peerster.FileMatches.isFullyMatched(decodedRequest) {
-				utils.DebugPrintln("We arent done with the search yet/file isnt fully matched")
-				return // TODO We arent done with the search yet/file isnt fully matched
-			}
-
-			// If we pass the checks, we need to perform a file download, but with a dynamic destination.
-			// First step: We create an order in which we will downlaod the chunks..
-			order, err := peerster.FileMatches.createDownloadChain(decodedRequest)
-			utils.DebugPrintln("WE JUST DID", order)
-			if err != nil {
-				utils.DebugPrintln(err)
-				return
-			}
-			dst := make([]byte, hex.DecodedLen(len([]byte(message.Request))))
-			_, _ = hex.Decode(dst, []byte(message.Request))
-			file := FileBeingDownloaded{
-				MetafileHash:   dst,
-				Channel:        make(chan messaging.DataReply),
-				CurrentChunk:   0,
-				Metafile:       nil,
-				DownloadedData: nil,
-				FileName:       message.File,
-			}
-			peerster.downloadData(order, file)
-
-		} else if message.Keywords != nil {
-			utils.DebugPrintln("SEARCHING")
-			peerster.searchForFiles(message.Keywords, message.Budget)
-		} else if message.Destination == nil || *message.Destination == "" {
-			peerster.sendNewRumorMessage(message.Text)
-		} else {
-			peerster.sendNewPrivateMessage(message)
-		}
-	}
 }
 
 func (peerster *Peerster) sendNewRumorMessage(text string) {
@@ -175,7 +97,7 @@ func (peerster *Peerster) sendNewRumorMessage(text string) {
 		Text:   text,
 	}
 	peerster.MsgSeqNumber = peerster.MsgSeqNumber + 1
-	peerster.handleIncomingRumor(&rumor, messaging.StringAddrToUDPAddr(peerster.GossipAddress), false)
+	peerster.handleIncomingRumor(&rumor, utils.StringAddrToUDPAddr(peerster.GossipAddress), false)
 }
 
 func (peerster *Peerster) sendNewPrivateMessage(msg messaging.Message) {
@@ -186,7 +108,7 @@ func (peerster *Peerster) sendNewPrivateMessage(msg messaging.Message) {
 		Destination: *msg.Destination,
 		HopLimit:    10,
 	}
-	peerster.handleIncomingPrivateMessage(&private, messaging.StringAddrToUDPAddr(peerster.GossipAddress))
+	peerster.handleIncomingPrivateMessage(&private, utils.StringAddrToUDPAddr(peerster.GossipAddress))
 }
 func (peerster *Peerster) startRumormongeringSession(peer string, message messaging.RumorMessage) error {
 	session, ok := peerster.RumormongeringSessions.GetSession(peer)
@@ -223,7 +145,7 @@ func (peerster *Peerster) startRumormongeringSession(peer string, message messag
 				session, ok := peerster.RumormongeringSessions.GetSession(peer)
 				peerster.RumormongeringSessions.DeactivateSession(peer)
 				if ok {
-					peerster.handleIncomingRumor(&session.Message, messaging.StringAddrToUDPAddr(peerster.GossipAddress), false) // we rerun
+					peerster.handleIncomingRumor(&session.Message, utils.StringAddrToUDPAddr(peerster.GossipAddress), false) // we rerun
 				}
 			}
 		}()
@@ -414,7 +336,7 @@ func (peerster *Peerster) handleIncomingStatusPacket(packet *messaging.StatusPac
 
 	session, ok := peerster.RumormongeringSessions.GetSession(originAddr.String())
 	if ok && session.Active && peerster.considerRumormongering() {
-		_ = peerster.handleIncomingRumor(&session.Message, messaging.StringAddrToUDPAddr(peerster.GossipAddress), true)
+		_ = peerster.handleIncomingRumor(&session.Message, utils.StringAddrToUDPAddr(peerster.GossipAddress), true)
 		//fmt.Printf("FLIPPED COIN sending rumor to %s \n", targetAddr)
 	}
 	peerster.stopRumormongeringSession(originAddr.String())
@@ -458,8 +380,8 @@ func (peerster *Peerster) serverReceive(buffer []byte, originAddr net.UDPAddr) {
 		peerster.handleIncomingPrivateMessage(receivedPacket.Private, originAddr)
 		peerster.handleIncomingDataReply(receivedPacket.DataReply, originAddr)
 		peerster.handleIncomingDataRequest(receivedPacket.DataRequest, originAddr)
-		peerster.handleIncomingSearchRequest(receivedPacket.SearchRequest, originAddr)
-		peerster.handleIncomingSearchReply(receivedPacket.SearchReply, originAddr)
+		// peerster.handleIncomingSearchRequest(receivedPacket.SearchRequest, originAddr)
+		// peerster.handleIncomingSearchReply(receivedPacket.SearchReply, originAddr)
 	} else {
 		fmt.Printf("SIMPLE MESSAGE origin %s from %s contents %s \n", receivedPacket.Simple.OriginalName, receivedPacket.Simple.RelayPeerAddr, receivedPacket.Simple.Contents)
 		blacklist := []string{addr} // we won't send a message to these peers
@@ -500,7 +422,7 @@ func (peerster *Peerster) Listen(origin Origin) {
 		peerster.Conn = conn
 	}
 	for {
-		buffer, originAddr, err := messaging.ReadFromConnection(conn)
+		buffer, originAddr, err := utils.ReadFromConnection(conn)
 		if err != nil {
 			log.Printf("Could not read from connection, origin: %s, reason: %s \n", origin, err)
 			break
@@ -652,7 +574,7 @@ func (peerster Peerster) sendToPeer(peer string, packet messaging.GossipPacket, 
 	if packet.Rumor != nil {
 		//fmt.Printf("MONGERING with %s \n", peer)
 	}
-	peerAddr := messaging.StringAddrToUDPAddr(peer)
+	peerAddr := utils.StringAddrToUDPAddr(peer)
 	packetBytes, err := protobuf.Encode(&packet)
 	if err != nil {
 		return err
@@ -680,7 +602,7 @@ func (peerster *Peerster) sendToKnownPeers(packet messaging.GossipPacket, blackl
 	for i := range peerster.KnownPeers {
 		peer := peerster.KnownPeers[i]
 		if peer == peerster.GossipAddress {
-			break
+			continue
 		}
 		err := peerster.sendToPeer(peer, packet, blacklist)
 		if err != nil {

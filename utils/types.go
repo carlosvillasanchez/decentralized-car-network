@@ -6,13 +6,18 @@ import (
 )
 
 type Position struct { // TODO will probably be defined elsewhere
-	x uint32
-	y uint32
+	X uint32
+	Y uint32
+}
+
+type CarPosition struct { // This is the position a car can have
+	sync.RWMutex
+	Position
 }
 
 type Car struct {
 	net.UDPAddr
-	Position
+	CarPosition
 	Id string
 }
 
