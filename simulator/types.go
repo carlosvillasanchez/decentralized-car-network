@@ -6,8 +6,8 @@ import (
 )
 
 type Position struct { // TODO will probably be defined elsewhere
-	x uint32
-	y uint32
+	X uint32
+	Y uint32
 }
 
 type Car struct {
