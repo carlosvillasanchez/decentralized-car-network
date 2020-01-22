@@ -28,24 +28,3 @@ func readConnection(conn *net.UDPConn) ([]byte, *net.UDPAddr, error) {
 	}
 	return buffer, originAddr, nil
 }
-func (simulator *CarNetworkSimulator) listenCars() {
-	/*
-		simulator.NetworkConnection = createConnection(simulator.NetworkAddress)
-		for {
-
-		}
-	*/
-}
-
-func (simulator *CarNetworkSimulator) listenFront() {
-	/*
-		simulator.FrontendConnection = createConnection(simulator.FrontendAddress)
-		for {
-
-		}
-	*/
-}
-
-func (simulator *CarNetworkSimulator) listenFrontend() {
-
-}

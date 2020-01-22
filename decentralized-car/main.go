@@ -64,7 +64,7 @@ func createPeerster() gossiper.Peerster {
 	endPositionP := utils.StringToPosition(*endPosition)
 
 	// Creation of the path of the car
-	carPath := CreatePath(finalCarMap, startPositionP, endPositionP)
+	carPath := gossiper.CreatePath(&finalCarMap, startPositionP, endPositionP, []utils.Position{})
 	return gossiper.Peerster{
 		UIPort:           *UIPort,
 		GossipAddress:    *gossipAddr,
@@ -74,7 +74,7 @@ func createPeerster() gossiper.Peerster {
 		AntiEntropyTimer: *antiEntropy,
 		CarMap:           &finalCarMap,
 		PathCar:          carPath,
-		BroadCastTimer:   broadcastTimer,
+		BroadcastTimer:   broadcastTimer,
 		RumormongeringSessions: messaging.AtomicRumormongeringSessionMap{
 			RumormongeringSessions: map[string]messaging.RumormongeringSession{},
 			Mutex:                  sync.RWMutex{},

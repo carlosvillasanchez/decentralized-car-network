@@ -3,7 +3,7 @@ package gossiper
 import (
 	"container/heap"
 	"fmt"
-	"github.com/tormey97/decentralized-car-network/simulator"
+	"github.com/tormey97/decentralized-car-network/utils"
 )
 
 /*
@@ -14,13 +14,13 @@ createPath(*peerster) (currentPos, targetPos, obstructions) -> [](int, int)
 */
 
 type pathfindingNode struct {
-	simulator.Position
+	utils.Position
 	cost        int
-	predecessor simulator.Position
+	predecessor utils.Position
 }
 
 // Returns the positions of the neighbors of a pathfindingNode
-func getNeighbors(node pathfindingNode, width, height int) []simulator.Position {
+func getNeighbors(node pathfindingNode, width, height int) []utils.Position {
 	// We convert to a signed int because we use values less than 0 to see if the node is on the edge of the map
 	type signedPosition struct {
 		X int
@@ -43,10 +43,10 @@ func getNeighbors(node pathfindingNode, width, height int) []simulator.Position 
 		Y: int(node.Position.Y) + 1,
 	}
 
-	var neighbors []simulator.Position
+	var neighbors []utils.Position
 	for _, neighbor := range []signedPosition{leftNeighbor, rightNeighbor, belowNeighbor, aboveNeighbor} {
 		if neighbor.X >= 0 && neighbor.X < width && neighbor.Y >= 0 && neighbor.Y < height {
-			neighbors = append(neighbors, simulator.Position{
+			neighbors = append(neighbors, utils.Position{
 				X: uint32(neighbor.X),
 				Y: uint32(neighbor.Y),
 			})
@@ -81,7 +81,7 @@ func (h *nodePriorityQueue) Pop() interface{} {
 	return x
 }
 
-func toPathfindingNode(pos simulator.Position) pathfindingNode {
+func toPathfindingNode(pos utils.Position) pathfindingNode {
 	return pathfindingNode{
 		Position: pos,
 		cost:     0,
@@ -91,11 +91,12 @@ func toPathfindingNode(pos simulator.Position) pathfindingNode {
 // need a struct for the detected cost for each checked node
 // [][]x, y, cost
 func CreatePath(
-	simulatedMap *simulator.SimulatedMap,
-	startPos, endPos simulator.Position,
-	obstructions []simulator.Position) []simulator.Position {
+	simulatedMap *utils.SimulatedMap,
+	startPos, endPos utils.Position,
+	obstructions []utils.Position) []utils.Position {
 	simulatedMap.RLock()
 	distances := [9][9]pathfindingNode{}
+	distances[startPos.X][startPos.Y].Position = startPos
 	openSet := nodePriorityQueue{toPathfindingNode(startPos)}
 	closedSet := nodePriorityQueue{}
 	pathFound := false
@@ -104,15 +105,30 @@ func CreatePath(
 		currentNode := heap.Pop(&openSet).(pathfindingNode)
 		closedSet.Push(currentNode)
 		neighbors := getNeighbors(currentNode, width, height)
+
 		for _, neighbor := range neighbors {
-			nodeType := simulatedMap.Grid[neighbor.X][neighbor.Y].Type
+			//nodeType := simulatedMap.Grid[neighbor.X][neighbor.Y].Type
+			// need to check if node is in obstructions, or if it's a building
 			neighborNode := distances[neighbor.X][neighbor.Y]
-			if currentNode.cost+1 < neighborNode.cost {
+			neighborNode.Position = neighbor
+			isObstruction := false
+			if simulatedMap.Grid[neighbor.X][neighbor.Y].Type == "building" {
+				isObstruction = true
+			} else {
+				for _, obstruction := range obstructions {
+					if obstruction == neighbor {
+						isObstruction = true
+						break
+					}
+				}
+			}
+			if !isObstruction && (currentNode.cost+1 < neighborNode.cost || neighborNode.cost == 0) {
 				neighborNode.cost = currentNode.cost + 1
 				neighborNode.predecessor = currentNode.Position
 			}
-			if !openSet.Contains(currentNode) && !closedSet.Contains(currentNode) {
-				heap.Push(&openSet, currentNode)
+			if !isObstruction && !openSet.Contains(neighborNode) && !closedSet.Contains(neighborNode) {
+				heap.Push(&openSet, neighborNode)
+				distances[neighbor.X][neighbor.Y] = neighborNode
 			}
 			if neighborNode.Position == endPos {
 				pathFound = true
@@ -120,7 +136,21 @@ func CreatePath(
 		}
 	}
 	if pathFound {
+		node := distances[endPos.X][endPos.Y]
+		reversePath := []utils.Position{endPos}
+		var path []utils.Position
+		for i := 0; i < 30; i++ {
+			reversePath = append(reversePath, node.Position)
+			if node.Position == startPos {
+				break
+			}
+			node = distances[node.predecessor.X][node.predecessor.Y]
 
+		}
+		for i := len(reversePath) - 1; i > 0; i-- {
+			path = append(path, reversePath[i])
+		}
+		return path
 	}
 	return nil
 }
