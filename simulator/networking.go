@@ -1,9 +1,10 @@
 package simulator
 
 import (
-	"github.com/tormey97/decentralized-car-network/utils"
 	"log"
 	"net"
+
+	"github.com/tormey97/decentralized-car-network/utils"
 )
 
 func createConnection(addr string) (*net.UDPConn, error) {

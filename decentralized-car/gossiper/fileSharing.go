@@ -2,10 +2,12 @@ package gossiper
 
 import (
 	"fmt"
-	"github.com/tormey97/Peerster/messaging"
 	"net"
 	"sync"
 	"time"
+
+	"github.com/tormey97/decentralized-car-network/decentralized-car/messaging"
+	"github.com/tormey97/decentralized-car-network/utils"
 )
 
 const HashSize = 32
@@ -96,7 +98,7 @@ func (peerster *Peerster) sendDataRequest(destination string, hash []byte) {
 		HashValue:   hash,
 	}
 	// TODO start a "download session", marked by the metafile hash + destination?
-	peerster.handleIncomingDataRequest(&request, messaging.StringAddrToUDPAddr(peerster.GossipAddress))
+	peerster.handleIncomingDataRequest(&request, utils.StringAddrToUDPAddr(peerster.GossipAddress))
 }
 
 // Starts a download of a specific chunk (or a metafile)
@@ -114,16 +116,16 @@ func (peerster *Peerster) downloadData(peerIdentifiers []string, previousDownloa
 	} else {
 		fmt.Printf("DOWNLOADING metafile of %s from %s \n", previousDownloadSession.FileName, peerIdentifier)
 	}
-	DownloadingFiles.setValue(index, previousDownloadSession)
+	peerster.DownloadingFiles.setValue(index, previousDownloadSession)
 	peerster.sendDataRequest(peerIdentifier, hash)
 	go func() {
-		value, ok := DownloadingFiles.getValue(index)
+		value, ok := peerster.DownloadingFiles.getValue(index)
 		if !ok {
 			return
 		}
 		select {
 		case reply := <-value.Channel:
-			fileBeingDownloaded, ok := DownloadingFiles.getValue(index)
+			fileBeingDownloaded, ok := peerster.DownloadingFiles.getValue(index)
 			if !ok {
 				// We aren't downloading this file, so why did we receive it? Who knows..
 				// TODO is that a possible case? ??? ??? ????
@@ -142,23 +144,23 @@ func (peerster *Peerster) downloadData(peerIdentifiers []string, previousDownloa
 				peerster.FileChunks.Map[string(reply.HashValue)] = reply.Data
 				peerster.FileChunks.Mutex.Unlock()
 			}
-			DownloadingFiles.setValue(index, fileBeingDownloaded)
+			peerster.DownloadingFiles.setValue(index, fileBeingDownloaded)
 
 		case <-time.After(5 * time.Second):
 			//fmt.Printf("DownloadingFiles session timeout with hash %v \n", hash)
 		}
-		value, ok = DownloadingFiles.getValue(index)
+		value, ok = peerster.DownloadingFiles.getValue(index)
 		if !ok {
 			//fmt.Printf("Warning: was unable to find the file download session when it should exist. Probably a bug \n")
 		}
-		if DownloadingFiles.isFullyDownloaded(index) {
+		if peerster.DownloadingFiles.isFullyDownloaded(index) {
 			err := reconstructAndSaveFile(value)
 			if err != nil {
 				fmt.Printf("Warning: Could not reconstruct/save file, reason: %s \n", err)
 			} else {
 				peerster.indexReconstructedFile(value)
 			}
-			DownloadingFiles.deleteValue(index)
+			peerster.DownloadingFiles.deleteValue(index)
 		} else {
 			// At this point, we either request the same hash over again (because of timeout)
 			// or we request the next hash (because we incremented currentChunk,
@@ -181,7 +183,7 @@ func (peerster *Peerster) handleIncomingDataReply(reply *messaging.DataReply, or
 		index := string(reply.HashValue)
 		// We send a message through the session's channel to trigger starting a new one with the next request
 		// or if its finished, reconstruct/save the file
-		DownloadingFiles.confirmReceivedDataReply(index, *reply)
+		peerster.DownloadingFiles.confirmReceivedDataReply(index, *reply)
 	} else if reply.HopLimit == 0 {
 		return
 	} else {
@@ -223,7 +225,7 @@ func (peerster *Peerster) handleIncomingDataRequest(request *messaging.DataReque
 			Data:        data,
 		}
 		// We send the DataReply into our incoming data reply handler, sending it into the network as normal
-		peerster.handleIncomingDataReply(reply, messaging.StringAddrToUDPAddr(peerster.GossipAddress))
+		peerster.handleIncomingDataReply(reply, utils.StringAddrToUDPAddr(peerster.GossipAddress))
 	} else if request.HopLimit == 0 {
 		return
 	} else {

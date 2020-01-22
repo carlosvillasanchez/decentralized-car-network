@@ -2,8 +2,9 @@ package gossiper
 
 import (
 	"fmt"
-	"github.com/tormey97/Peerster/messaging"
 	"time"
+
+	"github.com/tormey97/decentralized-car-network/decentralized-car/messaging"
 )
 
 func (peerster *Peerster) addToNextHopTable(rumor messaging.RumorMessage, originAddr string) {
