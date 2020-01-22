@@ -8,6 +8,7 @@ import (
 	// "github.com/tormey97/decentralized-car-network/simulator"
 )
 
+const ServerAddress string = "127.0.0.1:8888"
 const MaxBufferSize = 65536
 
 func ReadFromConnection(conn net.UDPConn) ([]byte, *net.UDPAddr, error) {
@@ -104,6 +105,42 @@ func SliceEqual(a, b []string) bool {
 func CreatePath(carMap SimulatedMap, startP, endP Position) []Position {
 	var dummy []Position
 	return dummy
+}
+
+// This functions return the area of the given position
+func AreaPositioner(position Position) int {
+	switch {
+	case position.X < 3 && position.Y < 3:
+		fmt.Println("Area 1")
+		return 1
+	case position.X < 6 && position.Y < 3:
+		fmt.Println("Area 2")
+		return 2
+	case position.X < 9 && position.Y < 3:
+		fmt.Println("Area 3")
+		return 3
+	case position.X < 3 && position.Y < 6:
+		fmt.Println("Area 4")
+		return 4
+	case position.X < 6 && position.Y < 6:
+		fmt.Println("Area 5")
+		return 5
+	case position.X < 9 && position.Y < 6:
+		fmt.Println("Area 6")
+		return 6
+	case position.X < 3 && position.Y < 9:
+		fmt.Println("Area 7")
+		return 7
+	case position.X < 6 && position.Y < 9:
+		fmt.Println("Area 8")
+		return 8
+	case position.X < 9 && position.Y < 9:
+		fmt.Println("Area 9")
+		return 9
+	default:
+		fmt.Println("Mayday, America has been discovered")
+		return -1
+	}
 }
 func SliceContains(a string, b []string) bool {
 	for i := range b {

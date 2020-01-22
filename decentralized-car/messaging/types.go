@@ -30,6 +30,7 @@ type GossipPacket struct {
 	DataReply     *DataReply
 	SearchRequest *SearchRequest
 	SearchReply   *SearchReply
+	InfoServer    *InfoToServer
 }
 
 type RumorMessage struct {
@@ -45,6 +46,9 @@ type Message struct {
 	File        string
 	Budget      int
 	Keywords    []string
+}
+type InfoToServer struct {
+	CarPosition utils.Position
 }
 type AreaMessage struct {
 	Origin string // Name of the car

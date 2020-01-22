@@ -126,5 +126,8 @@ func main() {
 
 	//Broadcast the car position in the current area of the car
 	peerster.BroadcastCarPosition()
+
+	//Rutine that sends information to the server
+	peerster.SendInfoToServer()
 	// peerster.Listen(gossiper.Client)
 }

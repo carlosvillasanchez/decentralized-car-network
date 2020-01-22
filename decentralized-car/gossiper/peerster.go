@@ -35,6 +35,7 @@ type Peerster struct {
 	CarPosition      utils.Position
 	EndCarP          utils.Position
 	PathCar          []utils.Position
+	PosCarsInArea    []messaging.AreaMessage
 	BroadcastTimer   int
 	ReceivedMessages struct { //TODO is there a nice way to make a generic mutex map type, instead of having to do this every time?
 		Map   map[string][]messaging.RumorMessage
@@ -207,6 +208,19 @@ func (peerster *Peerster) handleIncomingRumor(rumor *messaging.RumorMessage, ori
 	}
 	return peer
 }
+func (peerster *Peerster) handleIncomingArea(areaMessage *messaging.AreaMessage) {
+	if areaMessage == nil {
+		return
+	}
+	if *areaMessage == (messaging.AreaMessage{}) {
+		return
+	}
+	for index := range peerster.PosCarsInArea {
+		if peerster.PosCarsInArea[index].Origin == areaMessage.Origin {
+			peerster.PosCarsInArea[index] = *areaMessage
+		}
+	}
+}
 
 // Creates a map origin -> want
 // TODO should be a method
@@ -373,24 +387,18 @@ func (peerster *Peerster) serverReceive(buffer []byte, originAddr net.UDPAddr) {
 	if receivedPacket.Simple != nil && receivedPacket.Simple.RelayPeerAddr != "" {
 		addr = receivedPacket.Simple.RelayPeerAddr
 	}
-	peerster.addToKnownPeers(addr)
-	if !peerster.Simple {
-		peerster.handleIncomingRumor(receivedPacket.Rumor, originAddr, false)
-		peerster.handleIncomingStatusPacket(receivedPacket.Status, originAddr)
-		peerster.handleIncomingPrivateMessage(receivedPacket.Private, originAddr)
-		peerster.handleIncomingDataReply(receivedPacket.DataReply, originAddr)
-		peerster.handleIncomingDataRequest(receivedPacket.DataRequest, originAddr)
-		// peerster.handleIncomingSearchRequest(receivedPacket.SearchRequest, originAddr)
-		// peerster.handleIncomingSearchReply(receivedPacket.SearchReply, originAddr)
-	} else {
-		fmt.Printf("SIMPLE MESSAGE origin %s from %s contents %s \n", receivedPacket.Simple.OriginalName, receivedPacket.Simple.RelayPeerAddr, receivedPacket.Simple.Contents)
-		blacklist := []string{addr} // we won't send a message to these peers
-		receivedPacket.Simple.RelayPeerAddr = peerster.GossipAddress
-		err = peerster.sendToKnownPeers(*receivedPacket, blacklist)
-		if err != nil {
-			fmt.Printf("Error: could not send packet from some other peer, reason: %s \n", err)
-		}
+	// We only have to add them if they are in our area, they are if we receive area messages from them
+	if receivedPacket.Area != nil && receivedPacket.Area.Origin != "" {
+		peerster.addToKnownPeers(addr)
 	}
+	peerster.handleIncomingRumor(receivedPacket.Rumor, originAddr, false)
+	peerster.handleIncomingArea(receivedPacket.Area)
+	peerster.handleIncomingStatusPacket(receivedPacket.Status, originAddr)
+	peerster.handleIncomingPrivateMessage(receivedPacket.Private, originAddr)
+	peerster.handleIncomingDataReply(receivedPacket.DataReply, originAddr)
+	peerster.handleIncomingDataRequest(receivedPacket.DataRequest, originAddr)
+	// peerster.handleIncomingSearchRequest(receivedPacket.SearchRequest, originAddr)
+	// peerster.handleIncomingSearchReply(receivedPacket.SearchReply, originAddr)
 	//peerster.listPeers()
 }
 
