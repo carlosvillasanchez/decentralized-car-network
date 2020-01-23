@@ -34,9 +34,10 @@ type GossipPacket struct {
 }
 
 type RumorMessage struct {
-	Origin string
-	ID     uint32
-	Text   string
+	Origin    string
+	ID        uint32
+	Text      string
+	Newsgroup string
 }
 
 type Message struct {
