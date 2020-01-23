@@ -36,6 +36,7 @@ type Peerster struct {
 	EndCarP          utils.Position
 	PathCar          []utils.Position
 	PosCarsInArea    []messaging.AreaMessage
+	Newsgroups       []string
 	BroadcastTimer   int
 	ReceivedMessages struct { //TODO is there a nice way to make a generic mutex map type, instead of having to do this every time?
 		Map   map[string][]messaging.RumorMessage
