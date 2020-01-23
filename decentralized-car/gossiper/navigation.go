@@ -2,7 +2,6 @@ package gossiper
 
 import (
 	"container/heap"
-	"fmt"
 	"github.com/tormey97/decentralized-car-network/utils"
 )
 
@@ -88,13 +87,15 @@ func toPathfindingNode(pos utils.Position) pathfindingNode {
 	}
 }
 
-// need a struct for the detected cost for each checked node
-// [][]x, y, cost
+// Computes the shortest path from startPos to endPos in the map.
+// Takes into account buildings	in the map, also takes a list of "obstructions" which are positions deemed impassable
+// Returns a path starting at startPos and ending at endPos, or nil if no path was found
 func CreatePath(
 	simulatedMap *utils.SimulatedMap,
 	startPos, endPos utils.Position,
 	obstructions []utils.Position) []utils.Position {
 	simulatedMap.RLock()
+	defer simulatedMap.RUnlock()
 	distances := [9][9]pathfindingNode{}
 	distances[startPos.X][startPos.Y].Position = startPos
 	openSet := nodePriorityQueue{toPathfindingNode(startPos)}
@@ -153,8 +154,4 @@ func CreatePath(
 		return path
 	}
 	return nil
-}
-
-func main() {
-	fmt.Printf("Eh")
 }
