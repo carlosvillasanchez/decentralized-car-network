@@ -34,7 +34,11 @@ type SimulatedMap struct { // The entire simulated map
 	sync.RWMutex
 	Grid [9][9]Square // Matrix representing the whole map
 }
-
+type ColisionInformation struct {
+	NumberColisions int
+	IPCar           string
+	CoinFlip        int
+}
 type CarNetworkSimulator struct {
 	CarsInNetwork
 	SimulatedMap

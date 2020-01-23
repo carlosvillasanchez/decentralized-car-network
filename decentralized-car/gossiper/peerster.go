@@ -18,8 +18,9 @@ import (
 type Origin int
 
 const (
-	Client Origin = iota
-	Server Origin = iota
+	Client      Origin        = iota
+	Server      Origin        = iota
+	TIMEOUTCARS time.Duration = 50
 )
 
 type Peerster struct {
@@ -35,8 +36,9 @@ type Peerster struct {
 	CarPosition      utils.Position
 	EndCarP          utils.Position
 	PathCar          []utils.Position
-	PosCarsInArea    []messaging.AreaMessage
+	PosCarsInArea    messaging.CarInfomartionList
 	BroadcastTimer   int
+	ColisionInfo     utils.ColisionInformation
 	ReceivedMessages struct { //TODO is there a nice way to make a generic mutex map type, instead of having to do this every time?
 		Map   map[string][]messaging.RumorMessage
 		Mutex sync.RWMutex
@@ -208,18 +210,57 @@ func (peerster *Peerster) handleIncomingRumor(rumor *messaging.RumorMessage, ori
 	}
 	return peer
 }
-func (peerster *Peerster) handleIncomingArea(areaMessage *messaging.AreaMessage) {
+func (peerster *Peerster) handleIncomingArea(areaMessage *messaging.AreaMessage, IPofCar string) {
 	if areaMessage == nil {
 		return
 	}
 	if *areaMessage == (messaging.AreaMessage{}) {
 		return
 	}
-	for index := range peerster.PosCarsInArea {
-		if peerster.PosCarsInArea[index].Origin == areaMessage.Origin {
-			peerster.PosCarsInArea[index] = *areaMessage
+	carExists := false
+	peerster.PosCarsInArea.Mutex.Lock()
+	for _, carInfo := range peerster.PosCarsInArea.Slice {
+		if carInfo.Origin == areaMessage.Origin {
+			carInfo.Position = areaMessage.Position
+			carInfo.Channel <- false
+			carExists = true
 		}
 	}
+	peerster.PosCarsInArea.Mutex.Unlock()
+	if carExists == false {
+		infoOfCar := &messaging.CarInformation{
+			Origin:   areaMessage.Origin,
+			Position: areaMessage.Position,
+			Channel:  make(chan bool),
+			IPCar:    IPofCar,
+		}
+		peerster.PosCarsInArea.Mutex.Lock()
+		peerster.PosCarsInArea.Slice = append(peerster.PosCarsInArea.Slice, infoOfCar)
+		peerster.PosCarsInArea.Mutex.Unlock()
+		go peerster.timeoutAreaMessage(infoOfCar)
+	}
+
+}
+func (peerster *Peerster) timeoutAreaMessage(infoOfCar *messaging.CarInformation) {
+	for {
+		select {
+		// Delete car
+		case deleteCar := <-infoOfCar.Channel:
+			if deleteCar {
+				peerster.PosCarsInArea.Mutex.Lock()
+				for index, carInfo := range peerster.PosCarsInArea.Slice {
+					if carInfo.Origin == infoOfCar.Origin {
+						peerster.PosCarsInArea.Slice = append(peerster.PosCarsInArea.Slice[:index], peerster.PosCarsInArea.Slice[index+1:]...)
+					}
+				}
+				peerster.PosCarsInArea.Mutex.Unlock()
+				break
+			}
+		case <-time.After(TIMEOUTCARS * time.Second):
+			infoOfCar.Channel <- true
+		}
+	}
+	// First message from that car
 }
 
 // Creates a map origin -> want
@@ -392,7 +433,7 @@ func (peerster *Peerster) serverReceive(buffer []byte, originAddr net.UDPAddr) {
 		peerster.addToKnownPeers(addr)
 	}
 	peerster.handleIncomingRumor(receivedPacket.Rumor, originAddr, false)
-	peerster.handleIncomingArea(receivedPacket.Area)
+	peerster.handleIncomingArea(receivedPacket.Area, addr)
 	peerster.handleIncomingStatusPacket(receivedPacket.Status, originAddr)
 	peerster.handleIncomingPrivateMessage(receivedPacket.Private, originAddr)
 	peerster.handleIncomingDataReply(receivedPacket.DataReply, originAddr)
