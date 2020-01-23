@@ -5,8 +5,10 @@ import (
 	"net"
 	"strconv"
 	"strings"
+	// "github.com/tormey97/decentralized-car-network/simulator"
 )
 
+const ServerAddress string = "127.0.0.1:8888"
 const MaxBufferSize = 65536
 
 func ReadFromConnection(conn net.UDPConn) ([]byte, *net.UDPAddr, error) {
@@ -47,6 +49,48 @@ func StringAddrToUDPAddr(addr string) net.UDPAddr {
 	}
 }
 
+// This function takes a string of the map and transforms it to a matrix of Square objects
+func StringToCarMap(stringFlag string) [9][9]Square {
+	var squareType Square
+	// make([]int, 0, 5)
+	var carGrid [9][9]Square
+	// var carMap = Grid
+	for i := 0; i < 9; i++ {
+		stringSplit := strings.SplitN(stringFlag, ",", 10)
+		for j, square := range stringSplit {
+			squareType.Type = square
+			carGrid[i][j] = squareType
+		}
+	}
+	return carGrid
+}
+
+// This function  takes a map as array and returns it in string format
+func ArrayStringToString(incomingArray [][]string) string {
+
+	var strs []string
+
+	for _, value := range incomingArray {
+		rowString := strings.Join(value, ", ")
+		strs = append(strs, rowString)
+
+	}
+	finalString := strings.Join(strs, ", ")
+	return finalString
+}
+
+// This function takes the position in string format and returns it in Position formar
+func StringToPosition(posString string) Position {
+	PositionArray := strings.Split(posString, ",")
+	// startPositionP.X =
+	x, _ := strconv.ParseUint(PositionArray[0], 10, 32)
+	y, _ := strconv.ParseUint(PositionArray[1], 10, 32)
+	positionP := Position{
+		X: uint32(x),
+		Y: uint32(y),
+	}
+	return positionP
+}
 func SliceEqual(a, b []string) bool {
 	if len(a) != len(b) {
 		return false
@@ -58,7 +102,46 @@ func SliceEqual(a, b []string) bool {
 	}
 	return true
 }
+func CreatePath(carMap SimulatedMap, startP, endP Position) []Position {
+	var dummy []Position
+	return dummy
+}
 
+// This functions return the area of the given position
+func AreaPositioner(position Position) int {
+	switch {
+	case position.X < 3 && position.Y < 3:
+		fmt.Println("Area 1")
+		return 1
+	case position.X < 6 && position.Y < 3:
+		fmt.Println("Area 2")
+		return 2
+	case position.X < 9 && position.Y < 3:
+		fmt.Println("Area 3")
+		return 3
+	case position.X < 3 && position.Y < 6:
+		fmt.Println("Area 4")
+		return 4
+	case position.X < 6 && position.Y < 6:
+		fmt.Println("Area 5")
+		return 5
+	case position.X < 9 && position.Y < 6:
+		fmt.Println("Area 6")
+		return 6
+	case position.X < 3 && position.Y < 9:
+		fmt.Println("Area 7")
+		return 7
+	case position.X < 6 && position.Y < 9:
+		fmt.Println("Area 8")
+		return 8
+	case position.X < 9 && position.Y < 9:
+		fmt.Println("Area 9")
+		return 9
+	default:
+		fmt.Println("Mayday, America has been discovered")
+		return -1
+	}
+}
 func SliceContains(a string, b []string) bool {
 	for i := range b {
 		if b[i] == a {

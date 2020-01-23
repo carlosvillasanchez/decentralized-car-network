@@ -1,4 +1,4 @@
-package simulator
+package utils
 
 import (
 	"net"
@@ -6,13 +6,18 @@ import (
 )
 
 type Position struct { // TODO will probably be defined elsewhere
-	x uint32
-	y uint32
+	X uint32
+	Y uint32
+}
+
+type CarPosition struct { // This is the position a car can have
+	sync.RWMutex
+	Position
 }
 
 type Car struct {
 	net.UDPAddr
-	Position
+	CarPosition
 	Id string
 }
 
@@ -22,13 +27,12 @@ type CarsInNetwork struct {
 }
 
 type Square struct { // One grid/square in the map
-	Type string
-	Position
+	Type string // Type of the square, parking spot, accident, normal etc
 }
 
 type SimulatedMap struct { // The entire simulated map
 	sync.RWMutex
-	Grid [9][9]Square
+	Grid [9][9]Square // Matrix representing the whole map
 }
 
 type CarNetworkSimulator struct {
