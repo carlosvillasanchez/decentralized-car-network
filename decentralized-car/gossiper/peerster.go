@@ -92,25 +92,18 @@ func (peerster *Peerster) clientReceive(message messaging.Message) {
 
 }
 
-func (peerster *Peerster) sendNewRumorMessage(text string) {
-	rumor := messaging.RumorMessage{
-		Origin: peerster.Name,
-		ID:     peerster.MsgSeqNumber,
-		Text:   text,
-	}
-	peerster.MsgSeqNumber = peerster.MsgSeqNumber + 1
-	peerster.handleIncomingRumor(&rumor, utils.StringAddrToUDPAddr(peerster.GossipAddress), false)
+func (peerster *Peerster) sendNewRumorMessage(message messaging.RumorMessage) {
+	message.Origin = peerster.Name
+	message.ID = peerster.MsgSeqNumber
+	peerster.MsgSeqNumber += 1
+	peerster.handleIncomingRumor(&message, utils.StringAddrToUDPAddr(peerster.GossipAddress), false)
 }
 
-func (peerster *Peerster) sendNewPrivateMessage(msg messaging.Message) {
-	private := messaging.PrivateMessage{
-		Origin:      peerster.Name,
-		ID:          0,
-		Text:        msg.Text,
-		Destination: *msg.Destination,
-		HopLimit:    10,
-	}
-	peerster.handleIncomingPrivateMessage(&private, utils.StringAddrToUDPAddr(peerster.GossipAddress))
+func (peerster *Peerster) sendNewPrivateMessage(message messaging.PrivateMessage) {
+	message.Origin = peerster.Name
+	message.ID = 0
+	message.HopLimit = 10
+	peerster.handleIncomingPrivateMessage(&message, utils.StringAddrToUDPAddr(peerster.GossipAddress))
 }
 func (peerster *Peerster) startRumormongeringSession(peer string, message messaging.RumorMessage) error {
 	session, ok := peerster.RumormongeringSessions.GetSession(peer)
@@ -184,6 +177,11 @@ func (peerster *Peerster) handleIncomingRumor(rumor *messaging.RumorMessage, ori
 	if isNew {
 		// We add the originaddress to the next hop table if it's a new message
 		peerster.addToNextHopTable(*rumor, originAddr.String())
+	}
+	// If the message is in an appropriate newsgroup, we should handle the various subtypes of rumormessage
+	if peerster.filterMessageByNewsgroup(*rumor) {
+		peerster.handleIncomingAccident(*rumor)
+		peerster.handleIncomingAreaChange(*rumor)
 	}
 	isFromMyself := originAddr.String() == peerster.GossipAddress
 	peer := ""
@@ -260,6 +258,7 @@ func (peerster *Peerster) handleIncomingPrivateMessage(message *messaging.Privat
 	if message.Destination == peerster.Name {
 		fmt.Printf("PRIVATE origin %s hop-limit %v contents %s \n", message.Origin, message.HopLimit, message.Text)
 		peerster.addToPrivateMessages(*message)
+		peerster.handleIncomingAreaChangeResponse(message.AreaChangeResponse)
 	} else {
 		message.HopLimit--
 		if message.HopLimit == 0 {
