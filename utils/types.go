@@ -44,3 +44,13 @@ type CarNetworkSimulator struct {
 	SimulatedMap
 	net.UDPConn
 }
+type CarInformation struct {
+	Origin   string // Name of the car
+	Position Position
+	IPCar    string
+	Channel  chan bool
+}
+type CarInfomartionList struct {
+	Slice []*CarInformation
+	Mutex sync.RWMutex
+}

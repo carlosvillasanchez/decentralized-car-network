@@ -33,10 +33,10 @@ type Peerster struct {
 	Want             []messaging.PeerStatus
 	MsgSeqNumber     uint32
 	CarMap           *utils.SimulatedMap
-	CarPosition      utils.Position
-	EndCarP          utils.Position
+	CarPosition      utils.Position // unused?
+	EndCarP          utils.Position // unused?
 	PathCar          []utils.Position
-	PosCarsInArea    messaging.CarInfomartionList
+	PosCarsInArea    utils.CarInfomartionList
 	BroadcastTimer   int
 	ColisionInfo     utils.ColisionInformation
 	ReceivedMessages struct { //TODO is there a nice way to make a generic mutex map type, instead of having to do this every time?
@@ -228,7 +228,7 @@ func (peerster *Peerster) handleIncomingArea(areaMessage *messaging.AreaMessage,
 	}
 	peerster.PosCarsInArea.Mutex.Unlock()
 	if carExists == false {
-		infoOfCar := &messaging.CarInformation{
+		infoOfCar := &utils.CarInformation{
 			Origin:   areaMessage.Origin,
 			Position: areaMessage.Position,
 			Channel:  make(chan bool),
@@ -241,7 +241,7 @@ func (peerster *Peerster) handleIncomingArea(areaMessage *messaging.AreaMessage,
 	}
 
 }
-func (peerster *Peerster) timeoutAreaMessage(infoOfCar *messaging.CarInformation) {
+func (peerster *Peerster) timeoutAreaMessage(infoOfCar *utils.CarInformation) {
 	for {
 		select {
 		// Delete car
@@ -261,6 +261,54 @@ func (peerster *Peerster) timeoutAreaMessage(infoOfCar *messaging.CarInformation
 		}
 	}
 	// First message from that car
+}
+func (peerster *Peerster) handleIncomingResolutionM(colisionMessage *messaging.ColisionResolution, addr string) {
+	if colisionMessage == nil {
+		return
+	}
+	if *colisionMessage == (messaging.ColisionResolution{}) {
+		return
+	}
+	//This means that this message is the response to our coin flip
+	if peerster.ColisionInfo.CoinFlip != 0 {
+		hisCoinFlip := colisionMessage.CoinResult
+		peerster.colisionLogicManager(hisCoinFlip)
+
+		//If we are here is because someone is colliding with us and send us his coin flip
+	} else {
+		// We answer him back with the coin flip
+		min := 1
+		max := 7000
+		coinFlip := rand.Intn(max-min+1) + min
+		peerster.ColisionInfo.IPCar = addr
+		peerster.ColisionInfo.CoinFlip = coinFlip
+		peerster.SendNegotiationMessage()
+	}
+
+}
+func (peerster *Peerster) handleIncomingServerAccidentMessage(alertMessage *messaging.ServerMessage) {
+	if alertMessage == nil {
+		return
+	}
+	if *alertMessage == (messaging.ServerMessage{}) {
+		return
+	}
+}
+func (peerster *Peerster) colisionLogicManager(hisCoinFlip int) {
+	//If our coinflip is superior we don´t have to recalculate path
+	if peerster.ColisionInfo.CoinFlip > hisCoinFlip {
+		return
+		//This means that we have to move
+	} else {
+		var obstructions []utils.Position
+		// We tell the pathfinding alogirthm that we can't go there
+		obstructions = append(obstructions, peerster.PathCar[1])
+		peerster.PathCar = CreatePath(peerster.CarMap, peerster.PathCar[0], peerster.PathCar[len(peerster.PathCar)-1], obstructions)
+		//Reset colision object
+		peerster.ColisionInfo.CoinFlip = 0
+		peerster.ColisionInfo.NumberColisions = 0
+		peerster.ColisionInfo.IPCar = ""
+	}
 }
 
 // Creates a map origin -> want
@@ -432,6 +480,8 @@ func (peerster *Peerster) serverReceive(buffer []byte, originAddr net.UDPAddr) {
 	if receivedPacket.Area != nil && receivedPacket.Area.Origin != "" {
 		peerster.addToKnownPeers(addr)
 	}
+	peerster.handleIncomingServerAccidentMessage(receivedPacket.ServerAlert)
+	peerster.handleIncomingResolutionM(receivedPacket.Colision, addr)
 	peerster.handleIncomingRumor(receivedPacket.Rumor, originAddr, false)
 	peerster.handleIncomingArea(receivedPacket.Area, addr)
 	peerster.handleIncomingStatusPacket(receivedPacket.Status, originAddr)

@@ -32,6 +32,7 @@ type GossipPacket struct {
 	SearchReply   *SearchReply
 	InfoServer    *InfoToServer
 	Colision      *ColisionResolution
+	ServerAlert   *ServerMessage
 }
 
 type RumorMessage struct {
@@ -51,20 +52,13 @@ type Message struct {
 type InfoToServer struct {
 	CarPosition utils.Position
 }
+type ServerMessage struct {
+	Position utils.Position
+}
 type AreaMessage struct {
 	Origin string // Name of the car
 	// ID       uint32 // ID of the message, cars only analyze the message with the highest ID
 	Position utils.Position
-}
-type CarInformation struct {
-	Origin   string // Name of the car
-	Position utils.Position
-	IPCar    string
-	Channel  chan bool
-}
-type CarInfomartionList struct {
-	Slice []*CarInformation
-	Mutex sync.RWMutex
 }
 type FreeSpotMessage struct {
 	Origin          string // Name of the Announcing car
