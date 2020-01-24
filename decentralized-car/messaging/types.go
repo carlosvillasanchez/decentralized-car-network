@@ -31,6 +31,8 @@ type GossipPacket struct {
 	SearchRequest *SearchRequest
 	SearchReply   *SearchReply
 	InfoServer    *InfoToServer
+	Colision      *ColisionResolution
+	ServerAlert   *ServerMessage
 }
 
 type RumorMessage struct {
@@ -51,6 +53,9 @@ type Message struct {
 type InfoToServer struct {
 	CarPosition utils.Position
 }
+type ServerMessage struct {
+	Position utils.Position
+}
 type AreaMessage struct {
 	Origin string // Name of the car
 	// ID       uint32 // ID of the message, cars only analyze the message with the highest ID
@@ -61,6 +66,10 @@ type FreeSpotMessage struct {
 	ID              uint32
 	ParkingPosition utils.Position // Position of the parking spot
 	Taken           bool           // Wheter the spot is occuped already or not
+}
+type ColisionResolution struct {
+	Origin     string
+	CoinResult int
 }
 
 // type Position struct {

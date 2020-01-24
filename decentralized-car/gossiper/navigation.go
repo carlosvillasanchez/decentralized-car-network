@@ -2,6 +2,7 @@ package gossiper
 
 import (
 	"container/heap"
+
 	"github.com/tormey97/decentralized-car-network/utils"
 )
 
@@ -113,7 +114,7 @@ func CreatePath(
 			neighborNode := distances[neighbor.X][neighbor.Y]
 			neighborNode.Position = neighbor
 			isObstruction := false
-			if simulatedMap.Grid[neighbor.X][neighbor.Y].Type == "building" {
+			if simulatedMap.Grid[neighbor.X][neighbor.Y].Type == "B" {
 				isObstruction = true
 			} else {
 				for _, obstruction := range obstructions {
