@@ -37,6 +37,7 @@ type Peerster struct {
 	EndCarP          utils.Position // unused?
 	PathCar          []utils.Position
 	PosCarsInArea    utils.CarInfomartionList
+	Newsgroups       []string
 	BroadcastTimer   int
 	ColisionInfo     utils.ColisionInformation
 	ReceivedMessages struct { //TODO is there a nice way to make a generic mutex map type, instead of having to do this every time?
