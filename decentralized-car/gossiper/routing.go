@@ -15,7 +15,7 @@ func (peerster *Peerster) addToNextHopTable(rumor messaging.RumorMessage, origin
 
 // Sends
 func (peerster *Peerster) SendRouteMessage() {
-	peerster.sendNewRumorMessage("")
+	peerster.sendNewRumorMessage(messaging.RumorMessage{})
 }
 
 // Starts a goroutine that sends route messages periodically (for discovery)

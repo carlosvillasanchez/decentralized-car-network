@@ -18,6 +18,7 @@ type PrivateMessage struct {
 	Text        string
 	Destination string
 	HopLimit    uint32
+	AreaChangeResponse
 }
 
 type GossipPacket struct {
@@ -35,11 +36,24 @@ type GossipPacket struct {
 	ServerAlert   *ServerMessage
 }
 
+type AreaChangeResponse struct {
+}
+
+type AreaChangeMessage struct {
+	utils.Position
+}
+
+type AccidentMessage struct {
+	utils.Position
+}
+
 type RumorMessage struct {
 	Origin    string
 	ID        uint32
 	Text      string
 	Newsgroup string
+	*AreaChangeMessage
+	*AccidentMessage
 }
 
 type Message struct {
