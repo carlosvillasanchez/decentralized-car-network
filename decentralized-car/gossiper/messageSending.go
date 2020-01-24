@@ -48,3 +48,14 @@ func (peerster *Peerster) SendInfoToServer() {
 		}
 	}()
 }
+func (peerster *Peerster) SendNegotiationMessage() {
+	colisionMessage := messaging.ColisionResolution{
+		Origin:     peerster.Name,
+		CoinResult: peerster.ColisionInfo.CoinFlip,
+	}
+	packet := messaging.GossipPacket{
+		Colision: &colisionMessage,
+	}
+	var blacklist []string
+	peerster.sendToPeer(peerster.ColisionInfo.IPCar, packet, blacklist)
+}
