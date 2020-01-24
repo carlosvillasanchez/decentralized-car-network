@@ -40,6 +40,7 @@ type Peerster struct {
 	Newsgroups       []string
 	BroadcastTimer   int
 	ColisionInfo     utils.ColisionInformation
+	AreaChangeSession
 	ReceivedMessages struct { //TODO is there a nice way to make a generic mutex map type, instead of having to do this every time?
 		Map   map[string][]messaging.RumorMessage
 		Mutex sync.RWMutex
@@ -183,7 +184,7 @@ func (peerster *Peerster) handleIncomingRumor(rumor *messaging.RumorMessage, ori
 	// If the message is in an appropriate newsgroup, we should handle the various subtypes of rumormessage
 	if peerster.filterMessageByNewsgroup(*rumor) {
 		peerster.handleIncomingAccident(*rumor)
-		peerster.handleIncomingAreaChange(*rumor)
+		peerster.handleIncomingAreaChange(*rumor, originAddr.String())
 	}
 	isFromMyself := originAddr.String() == peerster.GossipAddress
 	peer := ""
