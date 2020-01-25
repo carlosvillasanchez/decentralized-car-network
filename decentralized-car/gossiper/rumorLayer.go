@@ -36,6 +36,24 @@ func (peerster *Peerster) handleIncomingAreaChange(message messaging.RumorMessag
 		peerster.sendNewPrivateMessage(privateMessage)
 	}
 }
+func (peerster *Peerster) handleIncomingFreeSpotMessage(message messaging.RumorMessage) {
+	if message.SpotPublishMessage == nil {
+		return
+	}
+	request := messaging.SpotPublicationRequest{
+		Position: message.SpotPublishMessage.Position,
+	}
+
+	//Request the spot
+	spotRequest := messaging.PrivateMessage{
+		Origin:                 peerster.Name,
+		HopLimit:               20,
+		ID:                     0,
+		Destination:            message.Origin,
+		SpotPublicationRequest: &request,
+	}
+	peerster.sendNewPrivateMessage(spotRequest)
+}
 
 func (peerster *Peerster) handleIncomingAccident(message messaging.RumorMessage) {
 	if message.AccidentMessage == nil {
