@@ -23,15 +23,18 @@ func (peerster *Peerster) MoveCarPosition() {
 
 	go func() {
 		for {
-			time.Sleep(time.Duration(peerster.BroadcastTimer) * time.Second)
-			areaChange := peerster.changeOfArea()
-			//There is a change in the area zone, so different procedure
-			if areaChange {
+			// If it is a police car stopped don't do anything
+			if peerster.PathCar != nil {
+				time.Sleep(time.Duration(peerster.BroadcastTimer) * time.Second)
+				areaChange := peerster.changeOfArea()
+				//There is a change in the area zone, so different procedure
+				if areaChange {
 
-				//There is no change, so just move to position and broadcast
-			} else {
-				//This function will advance the car to the next position if possible, checking there are not other cars
-				peerster.positionAdvancer()
+					//There is no change, so just move to position and broadcast
+				} else {
+					//This function will advance the car to the next position if possible, checking there are not other cars
+					peerster.positionAdvancer()
+				}
 			}
 		}
 	}()
@@ -78,6 +81,8 @@ func (peerster *Peerster) collisionChecker() bool {
 }
 func (peerster *Peerster) negotationOfColision() {
 	// You flip a coin and send the information to the other guy
+	//TODO: We have to add that if you are trying to change area,
+	// and another guy from your current area wants to negotiate with you, you always win and stay still
 	min := 1
 	max := 7000
 	coinFlip := rand.Intn(max-min+1) + min
