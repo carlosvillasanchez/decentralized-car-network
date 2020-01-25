@@ -5,6 +5,29 @@ import (
 	"sync"
 )
 
+const (
+	Parking = "parking" // For traces regarding parking spots
+	Crash   = "crash"   // For traces regarding the avoidance of crashes
+	Police  = "police"  // For traces regarding crash handling
+	Other   = "other"   // All rest of traces
+)
+
+// Recieve message info if we are entering a spot or accident zone
+type ServerMessage struct {
+	Type string
+}
+
+// Send position or trace
+type ServerNodeMessage struct {
+	Position *Position
+	Trace    *MessageTrace
+}
+
+// Traces to the server like, downloading file, accident spoted, colision management etc
+type MessageTrace struct {
+	Type string
+	Text string
+}
 type Position struct { // TODO will probably be defined elsewhere
 	X uint32
 	Y uint32

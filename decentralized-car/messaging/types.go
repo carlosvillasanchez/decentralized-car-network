@@ -18,7 +18,8 @@ type PrivateMessage struct {
 	Text        string
 	Destination string
 	HopLimit    uint32
-	AreaChangeResponse
+	*AreaChangeResponse
+	*AlertPolice
 }
 
 type GossipPacket struct {
@@ -31,12 +32,16 @@ type GossipPacket struct {
 	DataReply     *DataReply
 	SearchRequest *SearchRequest
 	SearchReply   *SearchReply
-	InfoServer    *InfoToServer
 	Colision      *ColisionResolution
-	ServerAlert   *ServerMessage
+	ServerAlert   *utils.ServerMessage
 }
 
 type AreaChangeResponse struct {
+}
+type AlertPolice struct {
+	utils.Position
+	Origin   string
+	Evidence []byte
 }
 
 type AreaChangeMessage struct {
@@ -64,12 +69,7 @@ type Message struct {
 	Budget      int
 	Keywords    []string
 }
-type InfoToServer struct {
-	CarPosition utils.Position
-}
-type ServerMessage struct {
-	Position utils.Position
-}
+
 type AreaMessage struct {
 	Origin string // Name of the car
 	// ID       uint32 // ID of the message, cars only analyze the message with the highest ID

@@ -23,23 +23,26 @@ func (peerster *Peerster) MoveCarPosition() {
 
 	go func() {
 		for {
-			time.Sleep(time.Duration(peerster.BroadcastTimer) * time.Second)
-			areaChange := peerster.changeOfArea()
-			//There is a change in the area zone, so different procedure
-			if areaChange {
-				peerster.sendAreaChangeMessage(peerster.PathCar[1])
-				peerster.startAreaChangeSession()
-				// we send an area change message, then we have to wait for a response
-				// use a channel, set a timeout to
-				// when moving into an area the car will stand still, so if another car begins negotiating with you
-				// you will get the maximum coinflip and keep your spot.
-				// to move into anothre area: send area change msg, create sessoin, wait for response, if response:
-				// repath
-				// else drive into slot
-				//There is no change, so just move to position and broadcast
-			} else {
-				//This function will advance the car to the next position if possible, checking there are not other cars
-				peerster.positionAdvancer()
+			// If it is a police car stopped don't do anything
+			if peerster.PathCar != nil {
+				time.Sleep(time.Duration(peerster.BroadcastTimer) * time.Second)
+				areaChange := peerster.changeOfArea()
+				//There is a change in the area zone, so different procedure
+				if areaChange {
+					peerster.sendAreaChangeMessage(peerster.PathCar[1])
+					peerster.startAreaChangeSession()
+					// we send an area change message, then we have to wait for a response
+					// use a channel, set a timeout to
+					// when moving into an area the car will stand still, so if another car begins negotiating with you
+					// you will get the maximum coinflip and keep your spot.
+					// to move into anothre area: send area change msg, create sessoin, wait for response, if response:
+					// repath
+					// else drive into slot
+					//There is no change, so just move to position and broadcast
+				} else {
+					//This function will advance the car to the next position if possible, checking there are not other cars
+					peerster.positionAdvancer()
+				}
 			}
 		}
 	}()
@@ -119,8 +122,10 @@ func negotiationCoinflip() int {
 }
 func (peerster *Peerster) negotationOfColision() {
 	// You flip a coin and send the information to the other guy
-
+	//TODO: We have to add that if you are trying to change area,
+	// and another guy from your current area wants to negotiate with you, you always win and stay still
 	coinFlip := negotiationCoinflip()
+
 	peerster.ColisionInfo.CoinFlip = coinFlip
 	peerster.SendNegotiationMessage()
 

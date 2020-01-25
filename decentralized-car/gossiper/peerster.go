@@ -18,9 +18,10 @@ import (
 type Origin int
 
 const (
-	Client      Origin        = iota
-	Server      Origin        = iota
-	TIMEOUTCARS time.Duration = 50
+	Client        Origin        = iota
+	Server        Origin        = iota
+	TIMEOUTCARS   time.Duration = 15
+	IMAGEACCIDENT string        = "accident.jpg"
 )
 
 type Peerster struct {
@@ -105,7 +106,7 @@ func (peerster *Peerster) sendNewRumorMessage(message messaging.RumorMessage) {
 func (peerster *Peerster) sendNewPrivateMessage(message messaging.PrivateMessage) {
 	message.Origin = peerster.Name
 	message.ID = 0
-	message.HopLimit = 10
+	message.HopLimit = 20
 	peerster.handleIncomingPrivateMessage(&message, utils.StringAddrToUDPAddr(peerster.GossipAddress))
 }
 func (peerster *Peerster) startRumormongeringSession(peer string, message messaging.RumorMessage) error {
@@ -228,18 +229,23 @@ func (peerster *Peerster) handleIncomingArea(areaMessage *messaging.AreaMessage,
 	}
 	peerster.PosCarsInArea.Mutex.Unlock()
 	if carExists == false {
-		infoOfCar := &utils.CarInformation{
-			Origin:   areaMessage.Origin,
-			Position: areaMessage.Position,
-			Channel:  make(chan bool),
-			IPCar:    IPofCar,
-		}
-		peerster.PosCarsInArea.Mutex.Lock()
-		peerster.PosCarsInArea.Slice = append(peerster.PosCarsInArea.Slice, infoOfCar)
-		peerster.PosCarsInArea.Mutex.Unlock()
-		go peerster.timeoutAreaMessage(infoOfCar)
+		origin := areaMessage.Origin
+		position := areaMessage.Position
+		peerster.saveCarInAreaStructure(origin, position, IPofCar)
 	}
 
+}
+func (peerster *Peerster) saveCarInAreaStructure(origin string, position utils.Position, IPofCar string) {
+	infoOfCar := &utils.CarInformation{
+		Origin:   origin,
+		Position: position,
+		Channel:  make(chan bool),
+		IPCar:    IPofCar,
+	}
+	peerster.PosCarsInArea.Mutex.Lock()
+	peerster.PosCarsInArea.Slice = append(peerster.PosCarsInArea.Slice, infoOfCar)
+	peerster.PosCarsInArea.Mutex.Unlock()
+	go peerster.timeoutAreaMessage(infoOfCar)
 }
 func (peerster *Peerster) timeoutAreaMessage(infoOfCar *utils.CarInformation) {
 	for {
@@ -286,13 +292,66 @@ func (peerster *Peerster) handleIncomingResolutionM(colisionMessage *messaging.C
 	}
 
 }
-func (peerster *Peerster) handleIncomingServerAccidentMessage(alertMessage *messaging.ServerMessage) {
+func (peerster *Peerster) handleIncomingAccidentMessage(alertToPolice *messaging.AlertPolice) {
+	if alertToPolice == nil {
+		return
+	}
+	// There has been an accident, so download file and go there
+	file := FileBeingDownloaded{
+		MetafileHash:   alertToPolice.Evidence,
+		Channel:        make(chan messaging.DataReply),
+		CurrentChunk:   0,
+		Metafile:       nil,
+		DownloadedData: nil,
+		FileName:       "accident.jpg",
+	}
+	peerster.downloadData([]string{alertToPolice.Origin}, file)
+
+	//Change path
+	// He spawns at the middle
+	startPos := utils.Position{
+		X: 4,
+		Y: 4,
+	}
+	var obstructions []utils.Position
+	peerster.PathCar = CreatePath(peerster.CarMap, startPos, alertToPolice.Position, obstructions)
+	// Now the police car should start movingg
+}
+
+func (peerster *Peerster) handleIncomingServerAccidentMessage(alertMessage *utils.ServerMessage) {
 	if alertMessage == nil {
 		return
 	}
-	if *alertMessage == (messaging.ServerMessage{}) {
+	if *alertMessage == (utils.ServerMessage{}) {
 		return
 	}
+	if alertMessage.Type != utils.Police {
+		return
+	}
+	// Notify the police via private message with hops and share the file
+	// Notify the rest of people with rumor monger
+	alert := messaging.AlertPolice{
+		Position: peerster.PathCar[0],
+	}
+	// File indexing
+	alert.Evidence = peerster.shareFile(IMAGEACCIDENT)
+	alert.Origin = peerster.Name
+	privateAlert := messaging.PrivateMessage{
+		AlertPolice: &alert,
+	}
+	peerster.sendNewPrivateMessage(privateAlert)
+}
+func (peerster *Peerster) handleIncomingServerSpotMessage(spotMessage *utils.ServerMessage) {
+	if spotMessage == nil {
+		return
+	}
+	if *spotMessage == (utils.ServerMessage{}) {
+		return
+	}
+	if spotMessage.Type != utils.Parking {
+		return
+	}
+	//TODO: Publish the spot in the newsgroup and initiate a session if someone wants to ask for the spot
 }
 func (peerster *Peerster) colisionLogicManager(hisCoinFlip int) {
 	//If our coinflip is superior we don´t have to recalculate path
@@ -348,7 +407,7 @@ func (peerster *Peerster) handleIncomingPrivateMessage(message *messaging.Privat
 	if message.Destination == peerster.Name {
 		fmt.Printf("PRIVATE origin %s hop-limit %v contents %s \n", message.Origin, message.HopLimit, message.Text)
 		peerster.addToPrivateMessages(*message)
-		peerster.handleIncomingAreaChangeResponse(message.AreaChangeResponse)
+		peerster.handleIncomingAreaChangeResponse(*message.AreaChangeResponse)
 	} else {
 		message.HopLimit--
 		if message.HopLimit == 0 {
@@ -477,13 +536,24 @@ func (peerster *Peerster) serverReceive(buffer []byte, originAddr net.UDPAddr) {
 	if receivedPacket.Simple != nil && receivedPacket.Simple.RelayPeerAddr != "" {
 		addr = receivedPacket.Simple.RelayPeerAddr
 	}
-	// We only have to add them if they are in our area, they are if we receive area messages from them
-	if receivedPacket.Area != nil && receivedPacket.Area.Origin != "" {
-		peerster.addToKnownPeers(addr)
+
+	peerster.addToKnownPeers(addr)
+
+	//Function only checked by police car
+	if peerster.Name == utils.Police {
+		peerster.handleIncomingAccidentMessage(receivedPacket.Private.AlertPolice)
 	}
+	//Function where the server tells the car if he has entered an accidented zone
 	peerster.handleIncomingServerAccidentMessage(receivedPacket.ServerAlert)
+
+	//Function where the server tells the car if he has entered a zone with free spot
+	peerster.handleIncomingServerSpotMessage(receivedPacket.ServerAlert)
+
+	//Function that handles a colision negotiation message
 	peerster.handleIncomingResolutionM(receivedPacket.Colision, addr)
 	peerster.handleIncomingRumor(receivedPacket.Rumor, originAddr, false)
+
+	//Function that handles position of other cars in area
 	peerster.handleIncomingArea(receivedPacket.Area, addr)
 	peerster.handleIncomingStatusPacket(receivedPacket.Status, originAddr)
 	peerster.handleIncomingPrivateMessage(receivedPacket.Private, originAddr)

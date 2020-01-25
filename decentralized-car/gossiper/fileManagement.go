@@ -75,17 +75,17 @@ type SharedFile struct {
 }
 
 // Reads a file from the _SharedFiles folder and calls indexReadFile on it
-func (peerster *Peerster) shareFile(fileName string) {
+func (peerster *Peerster) shareFile(fileName string) []byte {
 	file, err := readSharedFile(fileName)
 	if err != nil {
 		fmt.Printf("Could not read shared file, reason: %s \n", err)
-		return
+		return nil
 	}
-	peerster.indexReadFile(file, fileName)
+	return peerster.indexReadFile(file, fileName)
 }
 
 // Adds a read file to the peerster's internal data structure (chunks it and computes metafile/hash as well)
-func (peerster *Peerster) indexReadFile(file []byte, fileName string) { //TODO remove fileName arg
+func (peerster *Peerster) indexReadFile(file []byte, fileName string) []byte { //TODO remove fileName arg
 	chunks, chunkHashes := chunkFile(file)
 	metafile, metafileHash := computeMetafile(chunks)
 	sharedFile := SharedFile{
@@ -102,6 +102,7 @@ func (peerster *Peerster) indexReadFile(file []byte, fileName string) { //TODO r
 		//fmt.Println(i, chunkHashes[i])
 		peerster.FileChunks.Map[string(chunkHashes[i])] = chunks[i]
 	}
+	return metafileHash
 }
 
 func (peerster *Peerster) indexReconstructedFile(file FileBeingDownloaded) {

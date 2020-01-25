@@ -109,7 +109,7 @@ func CreatePath(carMap SimulatedMap, startP, endP Position) []Position {
 
 // This functions return the area of the given position
 func AreaPositioner(position Position) int {
-	switch {
+	/*switch {
 	case position.X < 3 && position.Y < 3:
 		fmt.Println("Area 1")
 		return 1
@@ -137,6 +137,23 @@ func AreaPositioner(position Position) int {
 	case position.X < 9 && position.Y < 9:
 		fmt.Println("Area 9")
 		return 9
+	default:
+		fmt.Println("Mayday, America has been discovered")
+		return -1
+	}*/
+	switch {
+	case position.X < 5 && position.Y < 5:
+		fmt.Println("Area 1")
+		return 1
+	case position.X < 9 && position.Y < 5:
+		fmt.Println("Area 2")
+		return 2
+	case position.X < 5 && position.Y < 9:
+		fmt.Println("Area 3")
+		return 3
+	case position.X < 9 && position.Y < 9:
+		fmt.Println("Area 4")
+		return 4
 	default:
 		fmt.Println("Mayday, America has been discovered")
 		return -1

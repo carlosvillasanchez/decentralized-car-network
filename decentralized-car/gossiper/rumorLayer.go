@@ -38,7 +38,7 @@ func (peerster *Peerster) handleIncomingAreaChange(message messaging.RumorMessag
 	if peerster.PathCar[0] == message.AreaChangeMessage.Position {
 		privateMessage := messaging.PrivateMessage{
 			Destination:        message.Origin,
-			AreaChangeResponse: messaging.AreaChangeResponse{},
+			AreaChangeResponse: &messaging.AreaChangeResponse{},
 		}
 		peerster.sendNewPrivateMessage(privateMessage)
 	}
