@@ -26,24 +26,25 @@ const (
 )
 
 type Peerster struct {
-	UIPort             string
-	GossipAddress      string
-	KnownPeers         []string
-	Name               string
-	Simple             bool
-	AntiEntropyTimer   int
-	Want               []messaging.PeerStatus
-	MsgSeqNumber       uint32
-	CarMap             *utils.SimulatedMap
-	CarPosition        utils.Position // unused?
-	EndCarP            utils.Position // unused?
-	PathCar            []utils.Position
-	PosCarsInArea      utils.CarInfomartionList
-	Newsgroups         []string
-	BroadcastTimer     int
-	ColisionInfo       utils.ColisionInformation
+	UIPort           string
+	GossipAddress    string
+	KnownPeers       []string
+	Name             string
+	Simple           bool
+	AntiEntropyTimer int
+	Want             []messaging.PeerStatus
+	MsgSeqNumber     uint32
+	CarMap           *utils.SimulatedMap
+	CarPosition      utils.Position // unused?
+	EndCarP          utils.Position // unused?
+	PathCar          []utils.Position
+	PosCarsInArea    utils.CarInfomartionList
+	Newsgroups       []string
+	BroadcastTimer   int
+	ColisionInfo     utils.ColisionInformation
+	AreaChangeSession
 	CarsInterestedSpot messaging.SpotInformation
-	ReceivedMessages   struct { //TODO is there a nice way to make a generic mutex map type, instead of having to do this every time?
+	ReceivedMessages struct { //TODO is there a nice way to make a generic mutex map type, instead of having to do this every time?
 		Map   map[string][]messaging.RumorMessage
 		Mutex sync.RWMutex
 	}
@@ -186,7 +187,7 @@ func (peerster *Peerster) handleIncomingRumor(rumor *messaging.RumorMessage, ori
 	// If the message is in an appropriate newsgroup, we should handle the various subtypes of rumormessage
 	if peerster.filterMessageByNewsgroup(*rumor) {
 		peerster.handleIncomingAccident(*rumor)
-		peerster.handleIncomingAreaChange(*rumor)
+		peerster.handleIncomingAreaChange(*rumor, originAddr.String())
 		//Function where you recieve a spot publication and can request it
 		peerster.handleIncomingFreeSpotMessage(*rumor)
 	}
@@ -243,6 +244,13 @@ func (peerster *Peerster) handleIncomingArea(areaMessage *messaging.AreaMessage,
 
 }
 func (peerster *Peerster) saveCarInAreaStructure(origin string, position utils.Position, IPofCar string) {
+	peerster.PosCarsInArea.Mutex.RLock()
+	for _, car := range peerster.PosCarsInArea.Slice {
+		if car.Origin == origin {
+			return // car already exists
+		}
+	}
+	peerster.PosCarsInArea.Mutex.RUnlock()
 	infoOfCar := &utils.CarInformation{
 		Origin:   origin,
 		Position: position,
@@ -290,9 +298,21 @@ func (peerster *Peerster) handleIncomingResolutionM(colisionMessage *messaging.C
 		//If we are here is because someone is colliding with us and send us his coin flip
 	} else {
 		// We answer him back with the coin flip
-		min := 1
-		max := 7000
-		coinFlip := rand.Intn(max-min+1) + min
+		coinFlip := NegotiationCoinflip()
+
+		if peerster.AreaChangeSession.Active {
+			// If we have an area change session active, we want to autowin the coinflip
+			peerster.AreaChangeSession.Channel <- true // we interrupt the area change session
+			peerster.PosCarsInArea.Mutex.RLock()
+			for _, v := range peerster.PosCarsInArea.Slice {
+				if v.Origin == colisionMessage.Origin {
+					// If the car sending the coinflip is in our area, we win the coinflip
+					if utils.AreaPositioner(v.Position) == utils.AreaPositioner(peerster.Position) {
+						coinFlip = MaxCoinflip + 1
+					}
+				}
+			}
+		}
 		peerster.ColisionInfo.IPCar = addr
 		peerster.ColisionInfo.CoinFlip = coinFlip
 		peerster.SendNegotiationMessage()
@@ -344,10 +364,6 @@ func (peerster *Peerster) handleIncomingServerAccidentMessage(alertMessage *util
 	alert.Evidence = peerster.shareFile(IMAGEACCIDENT)
 	alert.Origin = peerster.Name
 	privateAlert := messaging.PrivateMessage{
-		Origin:      peerster.Name,
-		HopLimit:    20,
-		ID:          0,
-		Destination: utils.Police,
 		AlertPolice: &alert,
 	}
 	peerster.sendNewPrivateMessage(privateAlert)
@@ -411,6 +427,7 @@ func (peerster *Peerster) spotAssigner() {
 func (peerster *Peerster) colisionLogicManager(hisCoinFlip int) {
 	//If our coinflip is superior we don´t have to recalculate path
 	if peerster.ColisionInfo.CoinFlip > hisCoinFlip {
+		//TODO call move here?
 		return
 		//This means that we have to move
 	} else {
