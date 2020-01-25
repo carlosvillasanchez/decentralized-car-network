@@ -19,6 +19,8 @@ import (
 	"github.com/tormey97/decentralized-car-network/utils"
 )
 
+const MaxCoinflip = 7000
+
 func (peerster *Peerster) MoveCarPosition() {
 
 	go func() {
@@ -94,17 +96,21 @@ func (peerster *Peerster) collisionChecker() bool {
 	return false
 }
 
-func negotiationCoinflip() int {
+func NegotiationCoinflip() int {
 
 	min := 1
-	max := 7000
+	max := MaxCoinflip
 	return rand.Intn(max-min+1) + min
 }
 func (peerster *Peerster) negotationOfColision() {
 	// You flip a coin and send the information to the other guy
 	//TODO: We have to add that if you are trying to change area,
 	// and another guy from your current area wants to negotiate with you, you always win and stay still
-	coinFlip := negotiationCoinflip()
+	coinFlip := NegotiationCoinflip()
+
+	if peerster.AreaChangeSession.Active {
+		coinFlip = MaxCoinflip + 1
+	}
 
 	peerster.ColisionInfo.CoinFlip = coinFlip
 	peerster.SendNegotiationMessage()
