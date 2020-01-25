@@ -45,7 +45,8 @@ type AlertPolice struct {
 }
 
 type AreaChangeMessage struct {
-	utils.Position
+	NextPosition    utils.Position
+	CurrentPosition utils.Position
 }
 
 type AccidentMessage struct {

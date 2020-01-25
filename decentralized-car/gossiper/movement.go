@@ -29,8 +29,8 @@ func (peerster *Peerster) MoveCarPosition() {
 				areaChange := peerster.changeOfArea()
 				//There is a change in the area zone, so different procedure
 				if areaChange {
-
-					//There is no change, so just move to position and broadcast
+					peerster.sendAreaChangeMessage(peerster.PathCar[1])
+					peerster.startAreaChangeSession()
 				} else {
 					//This function will advance the car to the next position if possible, checking there are not other cars
 					peerster.positionAdvancer()
@@ -38,8 +38,22 @@ func (peerster *Peerster) MoveCarPosition() {
 			}
 		}
 	}()
-
 }
+
+func (peerster *Peerster) startAreaChangeSession() {
+	peerster.AreaChangeSession.Position = peerster.PathCar[1]
+	peerster.AreaChangeSession.Active = true
+	for {
+		select {
+		case <-peerster.AreaChangeSession.Channel:
+			peerster.AreaChangeSession.Active = false
+			break
+		case <-time.After(6 * time.Second):
+			peerster.AreaChangeSession.Channel <- true
+		}
+	}
+}
+
 func (peerster *Peerster) changeOfArea() bool {
 	// If the area we are into is different to the one we are going, changing area
 	if utils.AreaPositioner(peerster.PathCar[0]) != utils.AreaPositioner(peerster.PathCar[1]) {
@@ -79,13 +93,19 @@ func (peerster *Peerster) collisionChecker() bool {
 	peerster.ColisionInfo.CoinFlip = 0
 	return false
 }
+
+func negotiationCoinflip() int {
+
+	min := 1
+	max := 7000
+	return rand.Intn(max-min+1) + min
+}
 func (peerster *Peerster) negotationOfColision() {
 	// You flip a coin and send the information to the other guy
 	//TODO: We have to add that if you are trying to change area,
 	// and another guy from your current area wants to negotiate with you, you always win and stay still
-	min := 1
-	max := 7000
-	coinFlip := rand.Intn(max-min+1) + min
+	coinFlip := negotiationCoinflip()
+
 	peerster.ColisionInfo.CoinFlip = coinFlip
 	peerster.SendNegotiationMessage()
 

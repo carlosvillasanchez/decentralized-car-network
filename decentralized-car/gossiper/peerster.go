@@ -41,6 +41,7 @@ type Peerster struct {
 	Newsgroups       []string
 	BroadcastTimer   int
 	ColisionInfo     utils.ColisionInformation
+	AreaChangeSession
 	ReceivedMessages struct { //TODO is there a nice way to make a generic mutex map type, instead of having to do this every time?
 		Map   map[string][]messaging.RumorMessage
 		Mutex sync.RWMutex
@@ -184,7 +185,7 @@ func (peerster *Peerster) handleIncomingRumor(rumor *messaging.RumorMessage, ori
 	// If the message is in an appropriate newsgroup, we should handle the various subtypes of rumormessage
 	if peerster.filterMessageByNewsgroup(*rumor) {
 		peerster.handleIncomingAccident(*rumor)
-		peerster.handleIncomingAreaChange(*rumor)
+		peerster.handleIncomingAreaChange(*rumor, originAddr.String())
 	}
 	isFromMyself := originAddr.String() == peerster.GossipAddress
 	peer := ""
@@ -235,6 +236,13 @@ func (peerster *Peerster) handleIncomingArea(areaMessage *messaging.AreaMessage,
 
 }
 func (peerster *Peerster) saveCarInAreaStructure(origin string, position utils.Position, IPofCar string) {
+	peerster.PosCarsInArea.Mutex.RLock()
+	for _, car := range peerster.PosCarsInArea.Slice {
+		if car.Origin == origin {
+			return // car already exists
+		}
+	}
+	peerster.PosCarsInArea.Mutex.RUnlock()
 	infoOfCar := &utils.CarInformation{
 		Origin:   origin,
 		Position: position,
@@ -282,6 +290,9 @@ func (peerster *Peerster) handleIncomingResolutionM(colisionMessage *messaging.C
 		//If we are here is because someone is colliding with us and send us his coin flip
 	} else {
 		// We answer him back with the coin flip
+		if peerster.AreaChangeSession.Active {
+			peerster.AreaChangeSession.Channel <- true // we interrupt the area change session
+		}
 		min := 1
 		max := 7000
 		coinFlip := rand.Intn(max-min+1) + min
@@ -355,6 +366,7 @@ func (peerster *Peerster) handleIncomingServerSpotMessage(spotMessage *utils.Ser
 func (peerster *Peerster) colisionLogicManager(hisCoinFlip int) {
 	//If our coinflip is superior we don´t have to recalculate path
 	if peerster.ColisionInfo.CoinFlip > hisCoinFlip {
+		//TODO call move here?
 		return
 		//This means that we have to move
 	} else {
