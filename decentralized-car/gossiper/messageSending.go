@@ -35,12 +35,9 @@ func (peerster *Peerster) SendInfoToServer() {
 	go func() {
 		for {
 			time.Sleep(time.Duration(peerster.BroadcastTimer) * time.Second)
-			infoToServerMessage := &messaging.InfoToServer{
-				CarPosition: peerster.PathCar[0],
-			}
 
-			packet := messaging.GossipPacket{
-				InfoServer: infoToServerMessage,
+			packet := utils.ServerNodeMessage{
+				Position: &peerster.PathCar[0],
 			}
 			peerAddr := utils.StringAddrToUDPAddr(utils.ServerAddress)
 			packetBytes, _ := protobuf.Encode(&packet)
