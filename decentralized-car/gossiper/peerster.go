@@ -290,12 +290,21 @@ func (peerster *Peerster) handleIncomingResolutionM(colisionMessage *messaging.C
 		//If we are here is because someone is colliding with us and send us his coin flip
 	} else {
 		// We answer him back with the coin flip
+		coinFlip := NegotiationCoinflip()
+
 		if peerster.AreaChangeSession.Active {
+			// If we have an area change session active, we want to autowin the coinflip
 			peerster.AreaChangeSession.Channel <- true // we interrupt the area change session
+			peerster.PosCarsInArea.Mutex.RLock()
+			for _, v := range peerster.PosCarsInArea.Slice {
+				if v.Origin == colisionMessage.Origin {
+					// If the car sending the coinflip is in our area, we win the coinflip
+					if utils.AreaPositioner(v.Position) == utils.AreaPositioner(peerster.Position) {
+						coinFlip = MaxCoinflip + 1
+					}
+				}
+			}
 		}
-		min := 1
-		max := 7000
-		coinFlip := rand.Intn(max-min+1) + min
 		peerster.ColisionInfo.IPCar = addr
 		peerster.ColisionInfo.CoinFlip = coinFlip
 		peerster.SendNegotiationMessage()
