@@ -20,6 +20,8 @@ type PrivateMessage struct {
 	HopLimit    uint32
 	*AreaChangeResponse
 	*AlertPolice
+	*SpotPublicationRequest
+	*SpotPublicationWinner
 }
 
 type GossipPacket struct {
@@ -52,7 +54,10 @@ type AreaChangeMessage struct {
 type AccidentMessage struct {
 	utils.Position
 }
-
+type SpotInformation struct {
+	SaveSpots bool
+	Requests  []PrivateMessage
+}
 type RumorMessage struct {
 	Origin    string
 	ID        uint32
@@ -60,6 +65,7 @@ type RumorMessage struct {
 	Newsgroup string
 	*AreaChangeMessage
 	*AccidentMessage
+	*SpotPublishMessage
 }
 
 type Message struct {
@@ -70,18 +76,35 @@ type Message struct {
 	Budget      int
 	Keywords    []string
 }
+type SpotPublishMessage struct {
+	Position utils.Position
+}
 
+// It is publish as a rumor message
+type SpotPublicationSession struct {
+	Message SpotPublishMessage
+	Channel chan bool
+}
+
+// It goes as a private message
+type SpotPublicationRequest struct {
+	Position utils.Position
+}
+type SpotPublicationWinner struct {
+	Position utils.Position
+}
 type AreaMessage struct {
 	Origin string // Name of the car
 	// ID       uint32 // ID of the message, cars only analyze the message with the highest ID
 	Position utils.Position
 }
-type FreeSpotMessage struct {
-	Origin          string // Name of the Announcing car
-	ID              uint32
-	ParkingPosition utils.Position // Position of the parking spot
-	Taken           bool           // Wheter the spot is occuped already or not
-}
+
+// type FreeSpotMessage struct {
+// 	Origin          string // Name of the Announcing car
+// 	ID              uint32
+// 	ParkingPosition utils.Position // Position of the parking spot
+// 	Taken           bool           // Wheter the spot is occuped already or not
+// }
 type ColisionResolution struct {
 	Origin     string
 	CoinResult int

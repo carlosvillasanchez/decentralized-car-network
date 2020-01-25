@@ -21,6 +21,7 @@ const (
 	Client        Origin        = iota
 	Server        Origin        = iota
 	TIMEOUTCARS   time.Duration = 15
+	TIMEOUTSPOTS  time.Duration = 7
 	IMAGEACCIDENT string        = "accident.jpg"
 )
 
@@ -42,6 +43,7 @@ type Peerster struct {
 	BroadcastTimer   int
 	ColisionInfo     utils.ColisionInformation
 	AreaChangeSession
+	CarsInterestedSpot messaging.SpotInformation
 	ReceivedMessages struct { //TODO is there a nice way to make a generic mutex map type, instead of having to do this every time?
 		Map   map[string][]messaging.RumorMessage
 		Mutex sync.RWMutex
@@ -186,6 +188,8 @@ func (peerster *Peerster) handleIncomingRumor(rumor *messaging.RumorMessage, ori
 	if peerster.filterMessageByNewsgroup(*rumor) {
 		peerster.handleIncomingAccident(*rumor)
 		peerster.handleIncomingAreaChange(*rumor, originAddr.String())
+		//Function where you recieve a spot publication and can request it
+		peerster.handleIncomingFreeSpotMessage(*rumor)
 	}
 	isFromMyself := originAddr.String() == peerster.GossipAddress
 	peer := ""
@@ -217,6 +221,10 @@ func (peerster *Peerster) handleIncomingArea(areaMessage *messaging.AreaMessage,
 	}
 	if *areaMessage == (messaging.AreaMessage{}) {
 		return
+	}
+	//If the other car is in your area, or the next point where you want to go (another area you want to enter)
+	if (utils.AreaPositioner(areaMessage.Position) == utils.AreaPositioner(peerster.PathCar[0])) || (areaMessage.Position == peerster.PathCar[1]) {
+
 	}
 	carExists := false
 	peerster.PosCarsInArea.Mutex.Lock()
@@ -371,6 +379,50 @@ func (peerster *Peerster) handleIncomingServerSpotMessage(spotMessage *utils.Ser
 		return
 	}
 	//TODO: Publish the spot in the newsgroup and initiate a session if someone wants to ask for the spot
+	go peerster.spotAssigner()
+}
+func (peerster *Peerster) handleIncomingSpotWinnerMessage(winnerAssigment *messaging.PrivateMessage) {
+	if winnerAssigment == nil {
+		return
+	}
+	if *winnerAssigment == (messaging.PrivateMessage{}) {
+		return
+	}
+	if winnerAssigment.SpotPublicationWinner == nil {
+		return
+	}
+	//Your are the winner so you change your path to the spot
+	var obstructions []utils.Position
+	peerster.PathCar = CreatePath(peerster.CarMap, peerster.PathCar[0], winnerAssigment.SpotPublicationWinner.Position, obstructions)
+}
+func (peerster *Peerster) spotAssigner() {
+	peerster.CarsInterestedSpot.SaveSpots = true
+	time.Sleep(time.Duration(TIMEOUTSPOTS) * time.Second)
+
+	//Now we should have all the request, so we have to assign a winner of the spot
+	carsWantingSpot := len(peerster.CarsInterestedSpot.Requests)
+	if carsWantingSpot > 0 {
+		min := 0
+		max := carsWantingSpot - 1
+		coinFlip := rand.Intn(max-min+1) + min
+
+		//The winner is
+		winnerSpot := peerster.CarsInterestedSpot.Requests[coinFlip]
+		//Send private message to the winner
+		spotPublicationWinner := messaging.SpotPublicationWinner{
+			Position: winnerSpot.SpotPublicationRequest.Position,
+		}
+		privateAlert := messaging.PrivateMessage{
+			Origin:                peerster.Name,
+			HopLimit:              20,
+			ID:                    0,
+			Destination:           utils.Police,
+			SpotPublicationWinner: &spotPublicationWinner,
+		}
+		peerster.sendNewPrivateMessage(privateAlert)
+		peerster.CarsInterestedSpot.SaveSpots = false
+		peerster.CarsInterestedSpot.Requests = nil
+	}
 }
 func (peerster *Peerster) colisionLogicManager(hisCoinFlip int) {
 	//If our coinflip is superior we don´t have to recalculate path
@@ -565,6 +617,9 @@ func (peerster *Peerster) serverReceive(buffer []byte, originAddr net.UDPAddr) {
 	}
 	//Function where the server tells the car if he has entered an accidented zone
 	peerster.handleIncomingServerAccidentMessage(receivedPacket.ServerAlert)
+
+	//Function where the cars that won receive the message
+	peerster.handleIncomingSpotWinnerMessage(receivedPacket.Private)
 
 	//Function where the server tells the car if he has entered a zone with free spot
 	peerster.handleIncomingServerSpotMessage(receivedPacket.ServerAlert)
