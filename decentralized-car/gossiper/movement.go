@@ -31,14 +31,6 @@ func (peerster *Peerster) MoveCarPosition() {
 				if areaChange {
 					peerster.sendAreaChangeMessage(peerster.PathCar[1])
 					peerster.startAreaChangeSession()
-					// we send an area change message, then we have to wait for a response
-					// use a channel, set a timeout to
-					// when moving into an area the car will stand still, so if another car begins negotiating with you
-					// you will get the maximum coinflip and keep your spot.
-					// to move into anothre area: send area change msg, create sessoin, wait for response, if response:
-					// repath
-					// else drive into slot
-					//There is no change, so just move to position and broadcast
 				} else {
 					//This function will advance the car to the next position if possible, checking there are not other cars
 					peerster.positionAdvancer()
@@ -54,22 +46,10 @@ func (peerster *Peerster) startAreaChangeSession() {
 	for {
 		select {
 		case <-peerster.AreaChangeSession.Channel:
-			if peerster.AreaChangeSession.CollisionCount == 0 {
-				peerster.AreaChangeSession.CollisionCount++
-				peerster.sendAreaChangeMessage(peerster.PathCar[1])
-				// move to area
-				// the other cars will add us to their known peers
-				// start broadcasting positions, so we use positions to know who is where
-				// we do normal collision negotiation when we try to move into a spot
-
-			} else {
-				// conflict twice, so we start negotiating with the guy
-			}
-
-			// we got a complaint, so wait one turn?
-		case <-time.After(6 * time.Second):
-			// move
+			peerster.AreaChangeSession.Active = false
 			break
+		case <-time.After(6 * time.Second):
+			peerster.AreaChangeSession.Channel <- true
 		}
 	}
 }
