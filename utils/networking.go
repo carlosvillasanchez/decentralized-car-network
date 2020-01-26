@@ -86,8 +86,8 @@ func StringToPosition(posString string) Position {
 	x, _ := strconv.ParseUint(PositionArray[0], 10, 32)
 	y, _ := strconv.ParseUint(PositionArray[1], 10, 32)
 	positionP := Position{
-		X: uint32(x),
-		Y: uint32(y),
+		X: int(x),
+		Y: int(y),
 	}
 	return positionP
 }

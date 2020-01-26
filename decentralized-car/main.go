@@ -64,8 +64,9 @@ func createPeerster() gossiper.Peerster {
 	endPositionP := utils.StringToPosition(*endPosition)
 
 	// Creation of the path of the car, except if is a police car
+	var carPath []utils.Position
 	if (startPositionP.X != -1) || (startPositionP.Y != -1) {
-		carPath := gossiper.CreatePath(&finalCarMap, startPositionP, endPositionP, []utils.Position{})
+		carPath = gossiper.CreatePath(&finalCarMap, startPositionP, endPositionP, []utils.Position{})
 	}
 	return gossiper.Peerster{
 		UIPort:           *UIPort,
