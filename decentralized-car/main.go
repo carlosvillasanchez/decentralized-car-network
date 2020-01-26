@@ -20,7 +20,6 @@ const (
 	Client Origin = iota
 	Server
 )
-const broadcastTimer int = 3 //Each 3 second the car broadcast position
 
 var emptyMap = [][]string{
 	{"B", "N", "N", "N", "N", "N", "N", "N", "N"},
@@ -50,6 +49,7 @@ func createPeerster() gossiper.Peerster {
 	if *peers != "" {
 		peersList = strings.Split(*peers, ",")
 	}
+
 	// Creation of the map, if empty put the empty map
 	var carMap [9][9]utils.Square
 	if *mapString == "" {
@@ -69,7 +69,8 @@ func createPeerster() gossiper.Peerster {
 	if (startPositionP.X != -1) && (startPositionP.Y != -1) {
 		carPath = gossiper.CreatePath(&finalCarMap, startPositionP, endPositionP, []utils.Position{})
 	}
-	return gossiper.Peerster{
+
+	peerster := gossiper.Peerster{
 		UIPort:           *UIPort,
 		GossipAddress:    *gossipAddr,
 		KnownPeers:       peersList,
@@ -78,7 +79,7 @@ func createPeerster() gossiper.Peerster {
 		AntiEntropyTimer: *antiEntropy,
 		CarMap:           &finalCarMap,
 		PathCar:          carPath,
-		BroadcastTimer:   broadcastTimer,
+		BroadcastTimer:   gossiper.BroadcastTimer,
 		PosCarsInArea: utils.CarInfomartionList{
 			Slice: make([]*utils.CarInformation, 0),
 			Mutex: sync.RWMutex{},
@@ -116,6 +117,11 @@ func createPeerster() gossiper.Peerster {
 			Mutex: sync.RWMutex{},
 		},
 	}
+	for _, v := range peersList {
+		peerster.SaveCarInAreaStructure("", utils.Position{}, v)
+	}
+
+	return peerster
 }
 
 func init() {

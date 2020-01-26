@@ -36,7 +36,7 @@ func (peerster *Peerster) handleIncomingAreaChange(message messaging.RumorMessag
 	// Someone wants to move to a position.
 	// Check if we are in that position. If we are, send an AreaChangeResponse back saying fuck off
 	// If not, what do we do? anyway we add the ip to our known peers
-	peerster.saveCarInAreaStructure(message.Origin, utils.Position{}, originAddress)
+	peerster.SaveCarInAreaStructure(message.Origin, utils.Position{}, originAddress)
 	/*
 		This code sends a specific response if there is a conflict, but I think that's not actually necessary.
 		if peerster.PathCar[0] == message.AreaChangeMessage.NextPositionPosition {

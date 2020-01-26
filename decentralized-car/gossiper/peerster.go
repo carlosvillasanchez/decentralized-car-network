@@ -18,11 +18,13 @@ import (
 type Origin int
 
 const (
-	Client        Origin        = iota
-	Server        Origin        = iota
-	TIMEOUTCARS   time.Duration = 15
-	TIMEOUTSPOTS  time.Duration = 7
-	IMAGEACCIDENT string        = "accident.jpg"
+	Client         Origin        = iota
+	Server         Origin        = iota
+	TIMEOUTCARS    time.Duration = 15
+	TIMEOUTSPOTS   time.Duration = 7
+	IMAGEACCIDENT  string        = "accident.jpg"
+	BroadcastTimer int           = 1 //Each 3 second the car broadcast position
+	MovementTimer  int           = 3
 )
 
 type Peerster struct {
@@ -225,6 +227,7 @@ func (peerster *Peerster) handleIncomingArea(areaMessage *messaging.AreaMessage,
 	if *areaMessage == (messaging.AreaMessage{}) {
 		return
 	}
+	fmt.Println(areaMessage.Origin, areaMessage.Position)
 	//If the other car is in your area, or the next point where you want to go (another area you want to enter)
 	if (utils.AreaPositioner(areaMessage.Position) == utils.AreaPositioner(peerster.PathCar[0])) || (areaMessage.Position == peerster.PathCar[1]) {
 
@@ -244,11 +247,11 @@ func (peerster *Peerster) handleIncomingArea(areaMessage *messaging.AreaMessage,
 	if carExists == false {
 		origin := areaMessage.Origin
 		position := areaMessage.Position
-		peerster.saveCarInAreaStructure(origin, position, IPofCar)
+		peerster.SaveCarInAreaStructure(origin, position, IPofCar)
 	}
 
 }
-func (peerster *Peerster) saveCarInAreaStructure(origin string, position utils.Position, IPofCar string) {
+func (peerster *Peerster) SaveCarInAreaStructure(origin string, position utils.Position, IPofCar string) {
 	fmt.Println("Lock peerster 249")
 
 	peerster.PosCarsInArea.Mutex.RLock()
@@ -306,7 +309,7 @@ func (peerster *Peerster) handleIncomingResolutionM(colisionMessage *messaging.C
 	if peerster.ColisionInfo.CoinFlip != 0 {
 		hisCoinFlip := colisionMessage.CoinResult
 		peerster.colisionLogicManager(hisCoinFlip)
-
+		fmt.Println("Coinflip:", hisCoinFlip, peerster.ColisionInfo.CoinFlip)
 		//If we are here is because someone is colliding with us and send us his coin flip
 	} else {
 		// We answer him back with the coin flip
@@ -330,6 +333,7 @@ func (peerster *Peerster) handleIncomingResolutionM(colisionMessage *messaging.C
 		}
 		peerster.ColisionInfo.IPCar = addr
 		peerster.ColisionInfo.CoinFlip = coinFlip
+
 		peerster.SendNegotiationMessage()
 	}
 

@@ -28,7 +28,7 @@ func (peerster *Peerster) MoveCarPosition() {
 		for {
 			// If it is a police car stopped don't do anything
 			if peerster.PathCar != nil {
-				time.Sleep(time.Duration(peerster.BroadcastTimer) * time.Second)
+				time.Sleep(time.Duration(MovementTimer) * time.Second)
 				areaChange := peerster.changeOfArea()
 				fmt.Println(peerster.PathCar)
 				//There is a change in the area zone, so different procedure
@@ -117,11 +117,6 @@ func (peerster *Peerster) negotationOfColision() {
 	//TODO: We have to add that if you are trying to change area,
 	// and another guy from your current area wants to negotiate with you, you always win and stay still
 	coinFlip := NegotiationCoinflip()
-
-	if peerster.AreaChangeSession.Active {
-		coinFlip = MaxCoinflip + 1
-	}
-
 	peerster.ColisionInfo.CoinFlip = coinFlip
 	peerster.SendNegotiationMessage()
 
