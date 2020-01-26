@@ -29,8 +29,8 @@ type MessageTrace struct {
 	Text string
 }
 type Position struct { // TODO will probably be defined elsewhere
-	X uint32
-	Y uint32
+	X int
+	Y int
 }
 
 type CarPosition struct { // This is the position a car can have

@@ -27,28 +27,28 @@ func getNeighbors(node pathfindingNode, width, height int) []utils.Position {
 		Y int
 	}
 	leftNeighbor := signedPosition{
-		X: int(node.Position.X) - 1,
-		Y: int(node.Position.Y),
+		X: node.Position.X - 1,
+		Y: node.Position.Y,
 	}
 	rightNeighbor := signedPosition{
-		X: int(node.Position.X) + 1,
-		Y: int(node.Position.Y),
+		X: node.Position.X + 1,
+		Y: node.Position.Y,
 	}
 	belowNeighbor := signedPosition{
-		X: int(node.Position.X),
-		Y: int(node.Position.Y) - 1,
+		X: node.Position.X,
+		Y: node.Position.Y - 1,
 	}
 	aboveNeighbor := signedPosition{
-		X: int(node.Position.X),
-		Y: int(node.Position.Y) + 1,
+		X: node.Position.X,
+		Y: node.Position.Y + 1,
 	}
 
 	var neighbors []utils.Position
 	for _, neighbor := range []signedPosition{leftNeighbor, rightNeighbor, belowNeighbor, aboveNeighbor} {
 		if neighbor.X >= 0 && neighbor.X < width && neighbor.Y >= 0 && neighbor.Y < height {
 			neighbors = append(neighbors, utils.Position{
-				X: uint32(neighbor.X),
-				Y: uint32(neighbor.Y),
+				X: neighbor.X,
+				Y: neighbor.Y,
 			})
 		}
 	}
