@@ -146,19 +146,14 @@ func AreaPositioner(position Position) int {
 	}*/
 	switch {
 	case position.X < 5 && position.Y < 5:
-		fmt.Println("Area 1")
 		return 1
 	case position.X < 9 && position.Y < 5:
-		fmt.Println("Area 2")
 		return 2
 	case position.X < 5 && position.Y < 9:
-		fmt.Println("Area 3")
 		return 3
 	case position.X < 9 && position.Y < 9:
-		fmt.Println("Area 4")
 		return 4
 	default:
-		fmt.Println("Mayday, America has been discovered")
 		return -1
 	}
 }

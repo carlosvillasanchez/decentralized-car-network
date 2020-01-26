@@ -59,13 +59,13 @@ type SpotInformation struct {
 	Requests  []PrivateMessage
 }
 type RumorMessage struct {
-	Origin    string
-	ID        uint32
-	Text      string
-	Newsgroup string
-	*AreaChangeMessage
-	*AccidentMessage
-	*SpotPublishMessage
+	Origin             string
+	ID                 uint32
+	Text               string
+	Newsgroup          string
+	AreaChangeMessage  *AreaChangeMessage
+	AccidentMessage    *AccidentMessage
+	SpotPublishMessage *SpotPublishMessage
 }
 
 type Message struct {

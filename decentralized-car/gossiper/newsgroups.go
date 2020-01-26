@@ -10,7 +10,7 @@ Then, add a function to filter rumormessages based on the field
 */
 
 // subscribes to a new newsgroup
-func (peerster *Peerster) subscribeToNewsgroup(newsgroup string) {
+func (peerster *Peerster) SubscribeToNewsgroup(newsgroup string) {
 	for _, _newsgroup := range peerster.Newsgroups {
 		if _newsgroup == newsgroup {
 			return
@@ -20,7 +20,7 @@ func (peerster *Peerster) subscribeToNewsgroup(newsgroup string) {
 }
 
 // unsubscribes from a newsgroup
-func (peerster *Peerster) unsubscribeFromNewsgroup(newsgroup string) {
+func (peerster *Peerster) UnsubscribeFromNewsgroup(newsgroup string) {
 	for i := range peerster.Newsgroups {
 		if peerster.Newsgroups[i] == newsgroup {
 			peerster.Newsgroups = append(peerster.Newsgroups[:i], peerster.Newsgroups[i+1:]...)
@@ -29,7 +29,7 @@ func (peerster *Peerster) unsubscribeFromNewsgroup(newsgroup string) {
 }
 
 // returns true if the peerster is subscribed to the message's newsgroup (or if it has no newsgroup), false otherwise
-func (peerster *Peerster) filterMessageByNewsgroup(message messaging.RumorMessage) bool {
+func (peerster *Peerster) FilterMessageByNewsgroup(message messaging.RumorMessage) bool {
 	if message.Newsgroup != "" {
 		for _, newsgroup := range peerster.Newsgroups {
 			if newsgroup == message.Newsgroup {

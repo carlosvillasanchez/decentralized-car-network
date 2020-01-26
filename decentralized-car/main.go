@@ -2,9 +2,9 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"math/rand"
 	"net"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -54,7 +54,6 @@ func createPeerster() gossiper.Peerster {
 	var carMap [9][9]utils.Square
 	if *mapString == "" {
 		carMap = utils.StringToCarMap(utils.ArrayStringToString(emptyMap))
-		fmt.Println("fernando is a dumbass", utils.ArrayStringToString(emptyMap))
 	} else {
 		carMap = utils.StringToCarMap(*mapString)
 	}
@@ -129,6 +128,7 @@ func init() {
 }
 func main() {
 	peerster := createPeerster()
+	peerster.SubscribeToNewsgroup(strconv.Itoa(utils.AreaPositioner(peerster.PathCar[0])))
 
 	// go peerster.ListenFrontend()
 	peerster.AntiEntropy()

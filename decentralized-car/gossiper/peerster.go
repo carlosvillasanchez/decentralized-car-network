@@ -20,7 +20,7 @@ type Origin int
 const (
 	Client         Origin        = iota
 	Server         Origin        = iota
-	TIMEOUTCARS    time.Duration = 15
+	TIMEOUTCARS    time.Duration = 40
 	TIMEOUTSPOTS   time.Duration = 7
 	IMAGEACCIDENT  string        = "accident.jpg"
 	BroadcastTimer int           = 1 //Each 3 second the car broadcast position
@@ -148,7 +148,6 @@ func (peerster *Peerster) startRumormongeringSession(peer string, message messag
 				session, ok := peerster.RumormongeringSessions.GetSession(peer)
 				peerster.RumormongeringSessions.DeactivateSession(peer)
 				if ok {
-					fmt.Printf("look at me %+v \n", session.Message)
 					peerster.handleIncomingRumor(&session.Message, utils.StringAddrToUDPAddr(peerster.GossipAddress), false) // we rerun
 				}
 			}
@@ -188,9 +187,10 @@ func (peerster *Peerster) handleIncomingRumor(rumor *messaging.RumorMessage, ori
 		peerster.addToNextHopTable(*rumor, originAddr.String())
 	}
 	// If the message is in an appropriate newsgroup, we should handle the various subtypes of rumormessage
-	if peerster.filterMessageByNewsgroup(*rumor) {
+	if peerster.FilterMessageByNewsgroup(*rumor) {
 		peerster.handleIncomingAccident(*rumor)
 		peerster.handleIncomingAreaChange(*rumor, originAddr.String())
+
 		//Function where you recieve a spot publication and can request it
 		peerster.handleIncomingFreeSpotMessage(*rumor)
 	}
@@ -227,17 +227,15 @@ func (peerster *Peerster) handleIncomingArea(areaMessage *messaging.AreaMessage,
 	if *areaMessage == (messaging.AreaMessage{}) {
 		return
 	}
-	fmt.Println(areaMessage.Origin, areaMessage.Position)
 	//If the other car is in your area, or the next point where you want to go (another area you want to enter)
-	if (utils.AreaPositioner(areaMessage.Position) == utils.AreaPositioner(peerster.PathCar[0])) || (areaMessage.Position == peerster.PathCar[1]) {
-
-	}
+	//if (utils.AreaPositioner(areaMessage.Position) == utils.AreaPositioner(peerster.PathCar[0])) || (areaMessage.Position == peerster.PathCar[1]) {
+	//TODO readd this?
+	//}
 	carExists := false
-	fmt.Println("Lock peerster 230")
-
 	peerster.PosCarsInArea.Mutex.Lock()
 	for _, carInfo := range peerster.PosCarsInArea.Slice {
-		if carInfo.Origin == areaMessage.Origin {
+		if carInfo.IPCar == IPofCar {
+			carInfo.Origin = areaMessage.Origin
 			carInfo.Position = areaMessage.Position
 			carInfo.Channel <- false
 			carExists = true
@@ -252,8 +250,6 @@ func (peerster *Peerster) handleIncomingArea(areaMessage *messaging.AreaMessage,
 
 }
 func (peerster *Peerster) SaveCarInAreaStructure(origin string, position utils.Position, IPofCar string) {
-	fmt.Println("Lock peerster 249")
-
 	peerster.PosCarsInArea.Mutex.RLock()
 	for _, car := range peerster.PosCarsInArea.Slice {
 		if car.Origin == origin {
@@ -268,8 +264,6 @@ func (peerster *Peerster) SaveCarInAreaStructure(origin string, position utils.P
 		Channel:  make(chan bool),
 		IPCar:    IPofCar,
 	}
-	fmt.Println("Lock peerster 264")
-
 	peerster.PosCarsInArea.Mutex.Lock()
 	peerster.PosCarsInArea.Slice = append(peerster.PosCarsInArea.Slice, infoOfCar)
 	peerster.PosCarsInArea.Mutex.Unlock()
@@ -281,8 +275,6 @@ func (peerster *Peerster) timeoutAreaMessage(infoOfCar *utils.CarInformation) {
 		// Delete car
 		case deleteCar := <-infoOfCar.Channel:
 			if deleteCar {
-				fmt.Println("Lock peerster 277")
-
 				peerster.PosCarsInArea.Mutex.Lock()
 				for index, carInfo := range peerster.PosCarsInArea.Slice {
 					if carInfo.Origin == infoOfCar.Origin {
@@ -305,8 +297,6 @@ func (peerster *Peerster) handleIncomingResolutionM(colisionMessage *messaging.C
 	if *colisionMessage == (messaging.ColisionResolution{}) {
 		return
 	}
-	fmt.Println("Coinflip:", colisionMessage.CoinResult, peerster.ColisionInfo.CoinFlip)
-
 	//This means that this message is the response to our coin flip
 	if peerster.ColisionInfo.CoinFlip != 0 {
 		hisCoinFlip := colisionMessage.CoinResult
@@ -318,9 +308,7 @@ func (peerster *Peerster) handleIncomingResolutionM(colisionMessage *messaging.C
 
 		if peerster.AreaChangeSession.Active {
 			// If we have an area change session active, we want to autowin the coinflip
-			fmt.Println("112412421")
 			peerster.AreaChangeSession.Channel <- true // we interrupt the area change session
-			fmt.Println("24242422")
 			peerster.PosCarsInArea.Mutex.RLock()
 			for _, v := range peerster.PosCarsInArea.Slice {
 				if v.Origin == colisionMessage.Origin {
@@ -335,6 +323,7 @@ func (peerster *Peerster) handleIncomingResolutionM(colisionMessage *messaging.C
 		peerster.ColisionInfo.IPCar = addr
 		peerster.ColisionInfo.CoinFlip = coinFlip
 		peerster.SendNegotiationMessage()
+		fmt.Println(colisionMessage.Origin, "Collision message ????? ")
 		peerster.colisionLogicManager(colisionMessage.CoinResult)
 	}
 

@@ -12,7 +12,6 @@ import (
 func (peerster *Peerster) BroadcastCarPosition() {
 	go func() {
 		for {
-			fmt.Println(peerster.PathCar)
 			time.Sleep(time.Duration(peerster.BroadcastTimer) * time.Second)
 			areaMessage := messaging.AreaMessage{
 				Origin:   peerster.Name,
