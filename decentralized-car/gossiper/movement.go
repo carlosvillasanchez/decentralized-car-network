@@ -13,6 +13,7 @@ import (
 	// 	"github.com/dedis/protobuf"
 	// 	"github.com/tormey97/decentralized-car-network/decentralized-car/messaging"
 
+	"fmt"
 	"math/rand"
 	"time"
 
@@ -29,6 +30,7 @@ func (peerster *Peerster) MoveCarPosition() {
 			if peerster.PathCar != nil {
 				time.Sleep(time.Duration(peerster.BroadcastTimer) * time.Second)
 				areaChange := peerster.changeOfArea()
+				fmt.Println(peerster.PathCar)
 				//There is a change in the area zone, so different procedure
 				if areaChange {
 					peerster.sendAreaChangeMessage(peerster.PathCar[1])
@@ -45,15 +47,20 @@ func (peerster *Peerster) MoveCarPosition() {
 func (peerster *Peerster) startAreaChangeSession() {
 	peerster.AreaChangeSession.Position = peerster.PathCar[1]
 	peerster.AreaChangeSession.Active = true
-	for {
-		select {
-		case <-peerster.AreaChangeSession.Channel:
-			peerster.AreaChangeSession.Active = false
-			break
-		case <-time.After(6 * time.Second):
-			peerster.AreaChangeSession.Channel <- true
-		}
+	fmt.Println("AREA CHANGING")
+	//for {
+	select {
+	case <-peerster.AreaChangeSession.Channel:
+		fmt.Println("WE STUCK?")
+		peerster.AreaChangeSession.Active = false
+	case <-time.After(6 * time.Second):
+		fmt.Println("I love channels")
+		peerster.positionAdvancer()
+		fmt.Println("Gets here?")
+		peerster.AreaChangeSession.Active = false
 	}
+	//}
+	fmt.Println("END FO FUNCTION")
 }
 
 func (peerster *Peerster) changeOfArea() bool {
@@ -64,11 +71,13 @@ func (peerster *Peerster) changeOfArea() bool {
 	return false
 }
 func (peerster *Peerster) positionAdvancer() {
+	fmt.Println("WE CALLED?")
 	if peerster.collisionChecker() == false {
 		peerster.PathCar = peerster.PathCar[1:]
-
+		fmt.Printf("Enter \n")
 		// There is a colision, do something
 	} else {
+		fmt.Println("Lol")
 		//If there has been more than 2 colision, negotiate
 		if peerster.ColisionInfo.NumberColisions >= 2 {
 			peerster.negotationOfColision()
@@ -80,6 +89,7 @@ func (peerster *Peerster) positionAdvancer() {
 	}
 }
 func (peerster *Peerster) collisionChecker() bool {
+	fmt.Println("Lock movement 92")
 	peerster.PosCarsInArea.Mutex.Lock()
 	defer peerster.PosCarsInArea.Mutex.Unlock()
 	for _, carInfo := range peerster.PosCarsInArea.Slice {

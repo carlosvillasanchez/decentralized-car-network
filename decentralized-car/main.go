@@ -1,7 +1,8 @@
-package decentralized_car
+package main
 
 import (
 	"flag"
+	"fmt"
 	"math/rand"
 	"net"
 	"strings"
@@ -22,14 +23,14 @@ const (
 const broadcastTimer int = 3 //Each 3 second the car broadcast position
 
 var emptyMap = [][]string{
+	{"B", "N", "N", "N", "N", "N", "N", "N", "N"},
 	{"N", "N", "N", "N", "N", "N", "N", "N", "N"},
 	{"N", "N", "N", "N", "N", "N", "N", "N", "N"},
 	{"N", "N", "N", "N", "N", "N", "N", "N", "N"},
 	{"N", "N", "N", "N", "N", "N", "N", "N", "N"},
 	{"N", "N", "N", "N", "N", "N", "N", "N", "N"},
 	{"N", "N", "N", "N", "N", "N", "N", "N", "N"},
-	{"N", "N", "N", "N", "N", "N", "N", "N", "N"},
-	{"N", "N", "N", "N", "N", "N", "N", "N", "N"},
+	{"N", "N", "N", "N", "N", "N", "N", "B", "N"},
 	{"N", "N", "N", "N", "N", "N", "N", "N", "N"},
 }
 
@@ -42,8 +43,8 @@ func createPeerster() gossiper.Peerster {
 	simple := flag.Bool("simple", false, "Simple mode")
 	antiEntropy := flag.Int("antiEntropy", 10, "Anti entropy timer")
 	rTimer := flag.Int("rtimer", 0, "Route rumor message interval timer")
-	startPosition := flag.String("startP", "", "the starting position of the car")   // 5,9 x=5, y = 9
-	endPosition := flag.String("endP", "", "the ending desired position of the car") // 5,9 x=5, y = 9
+	startPosition := flag.String("startP", "0,0", "the starting position of the car")   // 5,9 x=5, y = 9
+	endPosition := flag.String("endP", "8,8", "the ending desired position of the car") // 5,9 x=5, y = 9
 	flag.Parse()
 	peersList := []string{}
 	if *peers != "" {
@@ -53,19 +54,19 @@ func createPeerster() gossiper.Peerster {
 	var carMap [9][9]utils.Square
 	if *mapString == "" {
 		carMap = utils.StringToCarMap(utils.ArrayStringToString(emptyMap))
+		fmt.Println("fernando is a dumbass", utils.ArrayStringToString(emptyMap))
 	} else {
 		carMap = utils.StringToCarMap(*mapString)
 	}
 	var finalCarMap utils.SimulatedMap
 	finalCarMap.Grid = carMap
-
 	//Assigment of the positions of the car
 	startPositionP := utils.StringToPosition(*startPosition)
 	endPositionP := utils.StringToPosition(*endPosition)
 
 	// Creation of the path of the car, except if is a police car
 	var carPath []utils.Position
-	if (startPositionP.X != -1) || (startPositionP.Y != -1) {
+	if (startPositionP.X != -1) && (startPositionP.Y != -1) {
 		carPath = gossiper.CreatePath(&finalCarMap, startPositionP, endPositionP, []utils.Position{})
 	}
 	return gossiper.Peerster{
@@ -78,6 +79,10 @@ func createPeerster() gossiper.Peerster {
 		CarMap:           &finalCarMap,
 		PathCar:          carPath,
 		BroadcastTimer:   broadcastTimer,
+		PosCarsInArea: utils.CarInfomartionList{
+			Slice: make([]*utils.CarInformation, 0),
+			Mutex: sync.RWMutex{},
+		},
 		RumormongeringSessions: messaging.AtomicRumormongeringSessionMap{
 			RumormongeringSessions: map[string]messaging.RumormongeringSession{},
 			Mutex:                  sync.RWMutex{},
@@ -118,14 +123,10 @@ func init() {
 }
 func main() {
 	peerster := createPeerster()
-	//Handles all the incoming messages and the responses
-	go peerster.Listen(gossiper.Server)
+
 	// go peerster.ListenFrontend()
 	peerster.AntiEntropy()
 	peerster.SendRouteMessages()
-
-	//Moves the car in the map
-	peerster.MoveCarPosition()
 
 	//Broadcast the car position in the current area of the car
 	peerster.BroadcastCarPosition()
@@ -133,4 +134,10 @@ func main() {
 	//Rutine that sends information to the server
 	peerster.SendInfoToServer()
 	// peerster.Listen(gossiper.Client)
+
+	//Moves the car in the map
+	peerster.MoveCarPosition()
+
+	//Handles all the incoming messages and the responses
+	peerster.Listen(gossiper.Server)
 }

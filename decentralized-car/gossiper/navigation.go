@@ -2,7 +2,7 @@ package gossiper
 
 import (
 	"container/heap"
-
+	"fmt"
 	"github.com/tormey97/decentralized-car-network/utils"
 )
 
@@ -103,11 +103,11 @@ func CreatePath(
 	closedSet := nodePriorityQueue{}
 	pathFound := false
 	width, height := len(simulatedMap.Grid), len(simulatedMap.Grid[0])
+	fmt.Printf("HELLO %+v %+v \n", startPos, endPos)
 	for openSet.Len() > 0 && !pathFound {
 		currentNode := heap.Pop(&openSet).(pathfindingNode)
 		closedSet.Push(currentNode)
 		neighbors := getNeighbors(currentNode, width, height)
-
 		for _, neighbor := range neighbors {
 			//nodeType := simulatedMap.Grid[neighbor.X][neighbor.Y].Type
 			// need to check if node is in obstructions, or if it's a building

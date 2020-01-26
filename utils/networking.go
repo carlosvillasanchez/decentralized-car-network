@@ -57,7 +57,10 @@ func StringToCarMap(stringFlag string) [9][9]Square {
 	// var carMap = Grid
 	for i := 0; i < 9; i++ {
 		stringSplit := strings.SplitN(stringFlag, ",", 10)
-		for j, square := range stringSplit {
+		if i != 8 {
+			stringFlag = stringSplit[9]
+		}
+		for j, square := range stringSplit[:9] {
 			squareType.Type = square
 			carGrid[i][j] = squareType
 		}
@@ -83,11 +86,11 @@ func ArrayStringToString(incomingArray [][]string) string {
 func StringToPosition(posString string) Position {
 	PositionArray := strings.Split(posString, ",")
 	// startPositionP.X =
-	x, _ := strconv.ParseUint(PositionArray[0], 10, 32)
-	y, _ := strconv.ParseUint(PositionArray[1], 10, 32)
+	x, _ := strconv.Atoi(PositionArray[0])
+	y, _ := strconv.Atoi(PositionArray[1])
 	positionP := Position{
-		X: int(x),
-		Y: int(y),
+		X: x,
+		Y: y,
 	}
 	return positionP
 }

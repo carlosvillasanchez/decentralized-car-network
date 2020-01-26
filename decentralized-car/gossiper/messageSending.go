@@ -12,6 +12,7 @@ import (
 func (peerster *Peerster) BroadcastCarPosition() {
 	go func() {
 		for {
+			fmt.Println(peerster.PathCar)
 			time.Sleep(time.Duration(peerster.BroadcastTimer) * time.Second)
 			areaMessage := messaging.AreaMessage{
 				Origin:   peerster.Name,
@@ -21,13 +22,16 @@ func (peerster *Peerster) BroadcastCarPosition() {
 				Area: &areaMessage,
 			}
 			var blacklist []string
-			for i := range peerster.KnownPeers {
-				peer := peerster.KnownPeers[i]
+
+			peerster.PosCarsInArea.Mutex.RLock()
+			for i := range peerster.PosCarsInArea.Slice {
+				peer := peerster.PosCarsInArea.Slice[i].IPCar
 				err := peerster.sendToPeer(peer, packet, blacklist)
 				if err != nil {
 					fmt.Printf("Could not send to peer %q, reason: %s \n", peer, err)
 				}
 			}
+			peerster.PosCarsInArea.Mutex.RUnlock()
 		}
 	}()
 }

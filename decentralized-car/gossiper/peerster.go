@@ -44,7 +44,7 @@ type Peerster struct {
 	ColisionInfo     utils.ColisionInformation
 	AreaChangeSession
 	CarsInterestedSpot messaging.SpotInformation
-	ReceivedMessages struct { //TODO is there a nice way to make a generic mutex map type, instead of having to do this every time?
+	ReceivedMessages   struct { //TODO is there a nice way to make a generic mutex map type, instead of having to do this every time?
 		Map   map[string][]messaging.RumorMessage
 		Mutex sync.RWMutex
 	}
@@ -146,6 +146,7 @@ func (peerster *Peerster) startRumormongeringSession(peer string, message messag
 				session, ok := peerster.RumormongeringSessions.GetSession(peer)
 				peerster.RumormongeringSessions.DeactivateSession(peer)
 				if ok {
+					fmt.Printf("look at me %+v \n", session.Message)
 					peerster.handleIncomingRumor(&session.Message, utils.StringAddrToUDPAddr(peerster.GossipAddress), false) // we rerun
 				}
 			}
@@ -199,7 +200,9 @@ func (peerster *Peerster) handleIncomingRumor(rumor *messaging.RumorMessage, ori
 		peer = selectedPeer
 		if err != nil {
 			fmt.Printf("Warning: Could not send to random peer. Reason: %s \n", err)
+			return ""
 		}
+		fmt.Println(peer, selectedPeer, err)
 		peerster.stopRumormongeringSession(peer)
 		err = peerster.startRumormongeringSession(peer, *rumor)
 		if err != nil {
@@ -216,7 +219,7 @@ func (peerster *Peerster) handleIncomingRumor(rumor *messaging.RumorMessage, ori
 	return peer
 }
 func (peerster *Peerster) handleIncomingArea(areaMessage *messaging.AreaMessage, IPofCar string) {
-	if areaMessage == nil {
+	if areaMessage == nil || areaMessage.Origin == peerster.Name {
 		return
 	}
 	if *areaMessage == (messaging.AreaMessage{}) {
@@ -227,6 +230,8 @@ func (peerster *Peerster) handleIncomingArea(areaMessage *messaging.AreaMessage,
 
 	}
 	carExists := false
+	fmt.Println("Lock peerster 230")
+
 	peerster.PosCarsInArea.Mutex.Lock()
 	for _, carInfo := range peerster.PosCarsInArea.Slice {
 		if carInfo.Origin == areaMessage.Origin {
@@ -244,9 +249,12 @@ func (peerster *Peerster) handleIncomingArea(areaMessage *messaging.AreaMessage,
 
 }
 func (peerster *Peerster) saveCarInAreaStructure(origin string, position utils.Position, IPofCar string) {
+	fmt.Println("Lock peerster 249")
+
 	peerster.PosCarsInArea.Mutex.RLock()
 	for _, car := range peerster.PosCarsInArea.Slice {
 		if car.Origin == origin {
+			peerster.PosCarsInArea.Mutex.RUnlock()
 			return // car already exists
 		}
 	}
@@ -257,6 +265,8 @@ func (peerster *Peerster) saveCarInAreaStructure(origin string, position utils.P
 		Channel:  make(chan bool),
 		IPCar:    IPofCar,
 	}
+	fmt.Println("Lock peerster 264")
+
 	peerster.PosCarsInArea.Mutex.Lock()
 	peerster.PosCarsInArea.Slice = append(peerster.PosCarsInArea.Slice, infoOfCar)
 	peerster.PosCarsInArea.Mutex.Unlock()
@@ -268,6 +278,8 @@ func (peerster *Peerster) timeoutAreaMessage(infoOfCar *utils.CarInformation) {
 		// Delete car
 		case deleteCar := <-infoOfCar.Channel:
 			if deleteCar {
+				fmt.Println("Lock peerster 277")
+
 				peerster.PosCarsInArea.Mutex.Lock()
 				for index, carInfo := range peerster.PosCarsInArea.Slice {
 					if carInfo.Origin == infoOfCar.Origin {
@@ -302,7 +314,9 @@ func (peerster *Peerster) handleIncomingResolutionM(colisionMessage *messaging.C
 
 		if peerster.AreaChangeSession.Active {
 			// If we have an area change session active, we want to autowin the coinflip
+			fmt.Println("112412421")
 			peerster.AreaChangeSession.Channel <- true // we interrupt the area change session
+			fmt.Println("24242422")
 			peerster.PosCarsInArea.Mutex.RLock()
 			for _, v := range peerster.PosCarsInArea.Slice {
 				if v.Origin == colisionMessage.Origin {
@@ -312,6 +326,7 @@ func (peerster *Peerster) handleIncomingResolutionM(colisionMessage *messaging.C
 					}
 				}
 			}
+			peerster.PosCarsInArea.Mutex.RUnlock()
 		}
 		peerster.ColisionInfo.IPCar = addr
 		peerster.ColisionInfo.CoinFlip = coinFlip
