@@ -22,12 +22,19 @@ import (
 
 const MaxCoinflip = 7000
 
+func (peerster *Peerster) isLastPosition() bool {
+	if len(peerster.PathCar) <= 1 {
+		//TODO: CarPath( change the path to a random one
+		return true
+	}
+	return false
+}
 func (peerster *Peerster) MoveCarPosition() {
 
 	go func() {
 		for {
 			// If it is a police car stopped don't do anything
-			if peerster.PathCar != nil {
+			if peerster.PathCar != nil || peerster.isLastPosition() {
 				time.Sleep(time.Duration(MovementTimer) * time.Second)
 				areaChange := peerster.changeOfArea()
 				fmt.Println(peerster.PathCar)
@@ -71,13 +78,11 @@ func (peerster *Peerster) changeOfArea() bool {
 	return false
 }
 func (peerster *Peerster) positionAdvancer() {
-	fmt.Println("WE CALLED?")
 	if peerster.collisionChecker() == false {
 		peerster.PathCar = peerster.PathCar[1:]
-		fmt.Printf("Enter \n")
+		peerster.BroadcastCarPosition()
 		// There is a colision, do something
 	} else {
-		fmt.Println("Lol")
 		//If there has been more than 2 colision, negotiate
 		if peerster.ColisionInfo.NumberColisions >= 2 {
 			peerster.negotationOfColision()

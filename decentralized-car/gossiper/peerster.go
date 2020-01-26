@@ -305,11 +305,12 @@ func (peerster *Peerster) handleIncomingResolutionM(colisionMessage *messaging.C
 	if *colisionMessage == (messaging.ColisionResolution{}) {
 		return
 	}
+	fmt.Println("Coinflip:", colisionMessage.CoinResult, peerster.ColisionInfo.CoinFlip)
+
 	//This means that this message is the response to our coin flip
 	if peerster.ColisionInfo.CoinFlip != 0 {
 		hisCoinFlip := colisionMessage.CoinResult
 		peerster.colisionLogicManager(hisCoinFlip)
-		fmt.Println("Coinflip:", hisCoinFlip, peerster.ColisionInfo.CoinFlip)
 		//If we are here is because someone is colliding with us and send us his coin flip
 	} else {
 		// We answer him back with the coin flip
@@ -333,8 +334,8 @@ func (peerster *Peerster) handleIncomingResolutionM(colisionMessage *messaging.C
 		}
 		peerster.ColisionInfo.IPCar = addr
 		peerster.ColisionInfo.CoinFlip = coinFlip
-
 		peerster.SendNegotiationMessage()
+		peerster.colisionLogicManager(colisionMessage.CoinResult)
 	}
 
 }
