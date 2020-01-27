@@ -189,7 +189,7 @@ func (peerster *Peerster) handleIncomingRumor(rumor *messaging.RumorMessage, ori
 	// If the message is in an appropriate newsgroup, we should handle the various subtypes of rumormessage
 	if peerster.FilterMessageByNewsgroup(*rumor) {
 		peerster.handleIncomingAccident(*rumor)
-		peerster.handleIncomingAreaChange(*rumor, originAddr.String())
+		peerster.handleIncomingAreaChange(*rumor)
 
 		//Function where you recieve a spot publication and can request it
 		peerster.handleIncomingFreeSpotMessage(*rumor)
@@ -228,24 +228,24 @@ func (peerster *Peerster) handleIncomingArea(areaMessage *messaging.AreaMessage,
 		return
 	}
 	//If the other car is in your area, or the next point where you want to go (another area you want to enter)
-	//if (utils.AreaPositioner(areaMessage.Position) == utils.AreaPositioner(peerster.PathCar[0])) || (areaMessage.Position == peerster.PathCar[1]) {
-	//TODO readd this?
-	//}
-	carExists := false
-	peerster.PosCarsInArea.Mutex.Lock()
-	for _, carInfo := range peerster.PosCarsInArea.Slice {
-		if carInfo.IPCar == IPofCar {
-			carInfo.Origin = areaMessage.Origin
-			carInfo.Position = areaMessage.Position
-			carInfo.Channel <- false
-			carExists = true
+	if (len(peerster.PathCar) > 1) && ((utils.AreaPositioner(areaMessage.Position) == utils.AreaPositioner(peerster.PathCar[0])) || (areaMessage.Position == peerster.PathCar[1])) {
+
+		carExists := false
+		peerster.PosCarsInArea.Mutex.Lock()
+		for _, carInfo := range peerster.PosCarsInArea.Slice {
+			if carInfo.IPCar == IPofCar {
+				carInfo.Origin = areaMessage.Origin
+				carInfo.Position = areaMessage.Position
+				carInfo.Channel <- false
+				carExists = true
+			}
 		}
-	}
-	peerster.PosCarsInArea.Mutex.Unlock()
-	if carExists == false {
-		origin := areaMessage.Origin
-		position := areaMessage.Position
-		peerster.SaveCarInAreaStructure(origin, position, IPofCar)
+		peerster.PosCarsInArea.Mutex.Unlock()
+		if carExists == false {
+			origin := areaMessage.Origin
+			position := areaMessage.Position
+			peerster.SaveCarInAreaStructure(origin, position, IPofCar)
+		}
 	}
 
 }
@@ -257,6 +257,7 @@ func (peerster *Peerster) SaveCarInAreaStructure(origin string, position utils.P
 			return // car already exists
 		}
 	}
+	fmt.Println("Salvando chaval", IPofCar)
 	peerster.PosCarsInArea.Mutex.RUnlock()
 	infoOfCar := &utils.CarInformation{
 		Origin:   origin,
@@ -304,11 +305,11 @@ func (peerster *Peerster) handleIncomingResolutionM(colisionMessage *messaging.C
 		//If we are here is because someone is colliding with us and send us his coin flip
 	} else {
 		// We answer him back with the coin flip
-		coinFlip := NegotiationCoinflip()
+		coinFlip := peerster.NegotiationCoinflip()
 
 		if peerster.AreaChangeSession.Active {
 			// If we have an area change session active, we want to autowin the coinflip
-			peerster.AreaChangeSession.Channel <- true // we interrupt the area change session
+			//peerster.AreaChangeSession.Channel <- true // we interrupt the area change session FAKE NEWS
 			peerster.PosCarsInArea.Mutex.RLock()
 			for _, v := range peerster.PosCarsInArea.Slice {
 				if v.Origin == colisionMessage.Origin {

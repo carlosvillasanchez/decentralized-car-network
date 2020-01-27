@@ -101,6 +101,9 @@ func (peerster *Peerster) collisionChecker() bool {
 		if peerster.PathCar[1] == carInfo.Position {
 			peerster.ColisionInfo.NumberColisions = peerster.ColisionInfo.NumberColisions + 1
 			peerster.ColisionInfo.IPCar = carInfo.IPCar
+			fmt.Println("-------------------------")
+			fmt.Printf("%+v\n", peerster.PosCarsInArea.Slice)
+			fmt.Println(peerster.ColisionInfo.IPCar)
 			return true
 		}
 	}
@@ -110,8 +113,11 @@ func (peerster *Peerster) collisionChecker() bool {
 	return false
 }
 
-func NegotiationCoinflip() int {
-
+func (peerster *Peerster) NegotiationCoinflip() int {
+	//If he is standing still he should always win, he is not trying to move
+	if len(peerster.PathCar) == 1 {
+		return MaxCoinflip + 1
+	}
 	min := 1
 	max := MaxCoinflip
 	return rand.Intn(max-min+1) + min
@@ -120,7 +126,8 @@ func (peerster *Peerster) negotationOfColision() {
 	// You flip a coin and send the information to the other guy
 	//TODO: We have to add that if you are trying to change area,
 	// and another guy from your current area wants to negotiate with you, you always win and stay still
-	coinFlip := NegotiationCoinflip()
+	coinFlip := peerster.NegotiationCoinflip()
+
 	peerster.ColisionInfo.CoinFlip = coinFlip
 	peerster.SendNegotiationMessage()
 

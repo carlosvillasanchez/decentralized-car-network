@@ -47,6 +47,7 @@ type AlertPolice struct {
 }
 
 type AreaChangeMessage struct {
+	IpofCarChanging string
 	NextPosition    utils.Position
 	CurrentPosition utils.Position
 }

@@ -2,10 +2,11 @@ package gossiper
 
 import (
 	"fmt"
-	"github.com/tormey97/decentralized-car-network/decentralized-car/messaging"
-	"github.com/tormey97/decentralized-car-network/utils"
 	"strconv"
 	"sync"
+
+	"github.com/tormey97/decentralized-car-network/decentralized-car/messaging"
+	"github.com/tormey97/decentralized-car-network/utils"
 )
 
 type AreaChangeSession struct {
@@ -20,6 +21,7 @@ func (peerster *Peerster) sendAreaChangeMessage(pos utils.Position) {
 	message := messaging.AreaChangeMessage{
 		NextPosition:    pos,
 		CurrentPosition: peerster.PathCar[0],
+		IpofCarChanging: peerster.GossipAddress,
 	}
 	rumorMessage := messaging.RumorMessage{
 		Newsgroup:         strconv.Itoa(utils.AreaPositioner(peerster.PathCar[1])), //TODO get newsgroup
@@ -29,14 +31,14 @@ func (peerster *Peerster) sendAreaChangeMessage(pos utils.Position) {
 	peerster.sendNewRumorMessage(rumorMessage)
 }
 
-func (peerster *Peerster) handleIncomingAreaChange(message messaging.RumorMessage, originAddress string) {
+func (peerster *Peerster) handleIncomingAreaChange(message messaging.RumorMessage) {
 	if message.AreaChangeMessage == nil || message.Origin == peerster.Name {
 		return
 	}
 	// Someone wants to move to a position.
 	// Check if we are in that position. If we are, send an AreaChangeResponse back saying fuck off
 	// If not, what do we do? anyway we add the ip to our known peers
-	peerster.SaveCarInAreaStructure(message.Origin, message.AreaChangeMessage.CurrentPosition, originAddress)
+	peerster.SaveCarInAreaStructure(message.Origin, message.AreaChangeMessage.CurrentPosition, message.AreaChangeMessage.IpofCarChanging)
 	for _, v := range peerster.PosCarsInArea.Slice {
 		fmt.Printf("POS CARS IN AREA:  %+v \n", v)
 	}
