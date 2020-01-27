@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"math/rand"
 	"net"
 	"strconv"
@@ -124,6 +125,7 @@ func createPeerster() gossiper.Peerster {
 }
 
 func init() {
+	fmt.Println("hola")
 	rand.Seed(time.Now().UTC().UnixNano())
 }
 func main() {

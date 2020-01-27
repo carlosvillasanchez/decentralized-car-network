@@ -20,7 +20,7 @@ type Origin int
 const (
 	Client          Origin        = iota
 	Server          Origin        = iota
-	TIMEOUTCARS     time.Duration = 25
+	TIMEOUTCARS     time.Duration = 30
 	TIMEOUTSPOTS    time.Duration = 7
 	IMAGEACCIDENT   string        = "accident.jpg"
 	BroadcastTimer  int           = 1 //Each 1 second the car broadcast position
@@ -42,6 +42,7 @@ type Peerster struct {
 	EndCarP          utils.Position // unused?
 	PathCar          []utils.Position
 	PosCarsInArea    utils.CarInfomartionList
+	Winner           bool
 	Newsgroups       []string
 	BroadcastTimer   int
 	ColisionInfo     utils.ColisionInformation
@@ -228,23 +229,34 @@ func (peerster *Peerster) handleIncomingArea(areaMessage *messaging.AreaMessage,
 		return
 	}
 	//If the other car is in your area, or the next point where you want to go (another area you want to enter)
-	if (len(peerster.PathCar) > 1) && ((utils.AreaPositioner(areaMessage.Position) == utils.AreaPositioner(peerster.PathCar[0])) || (areaMessage.Position == peerster.PathCar[1])) {
+	if len(peerster.PathCar) > 1 {
+		if (utils.AreaPositioner(areaMessage.Position) == utils.AreaPositioner(peerster.PathCar[0])) || (areaMessage.Position == peerster.PathCar[1]) {
 
-		carExists := false
-		peerster.PosCarsInArea.Mutex.Lock()
-		for _, carInfo := range peerster.PosCarsInArea.Slice {
-			if carInfo.IPCar == IPofCar {
-				carInfo.Origin = areaMessage.Origin
-				carInfo.Position = areaMessage.Position
-				carInfo.Channel <- false
-				carExists = true
+			carExists := false
+			peerster.PosCarsInArea.Mutex.Lock()
+			for _, carInfo := range peerster.PosCarsInArea.Slice {
+				if carInfo.IPCar == IPofCar {
+					carInfo.Origin = areaMessage.Origin
+					carInfo.Position = areaMessage.Position
+					carInfo.Channel <- false
+					carExists = true
+				}
 			}
-		}
-		peerster.PosCarsInArea.Mutex.Unlock()
-		if carExists == false {
-			origin := areaMessage.Origin
-			position := areaMessage.Position
-			peerster.SaveCarInAreaStructure(origin, position, IPofCar)
+			peerster.PosCarsInArea.Mutex.Unlock()
+			if carExists == false {
+				origin := areaMessage.Origin
+				position := areaMessage.Position
+				peerster.SaveCarInAreaStructure(origin, position, IPofCar)
+			}
+		} else {
+			peerster.PosCarsInArea.Mutex.Lock()
+			for _, carInfo := range peerster.PosCarsInArea.Slice {
+				if carInfo.IPCar == IPofCar {
+					carInfo.Origin = areaMessage.Origin
+					carInfo.Position = areaMessage.Position
+				}
+			}
+			peerster.PosCarsInArea.Mutex.Unlock()
 		}
 	}
 
@@ -298,6 +310,13 @@ func (peerster *Peerster) handleIncomingResolutionM(colisionMessage *messaging.C
 	if *colisionMessage == (messaging.ColisionResolution{}) {
 		return
 	}
+	if colisionMessage.Position != peerster.PathCar[0] {
+		fmt.Println("position", colisionMessage.Position)
+		peerster.ColisionInfo.IPCar = addr
+		peerster.ColisionInfo.CoinFlip = -1
+		peerster.SendNegotiationMessage()
+		return
+	}
 	//This means that this message is the response to our coin flip
 	if peerster.ColisionInfo.CoinFlip != 0 {
 		hisCoinFlip := colisionMessage.CoinResult
@@ -321,8 +340,6 @@ func (peerster *Peerster) handleIncomingResolutionM(colisionMessage *messaging.C
 			}
 			peerster.PosCarsInArea.Mutex.RUnlock()
 		}
-		//This is to avoid doing a colision negotiation while one is being performed on us
-		peerster.ColisionInfo.NumberColisions = 0
 		peerster.ColisionInfo.IPCar = addr
 		peerster.ColisionInfo.CoinFlip = coinFlip
 		peerster.SendNegotiationMessage()
@@ -439,9 +456,11 @@ func (peerster *Peerster) spotAssigner() {
 func (peerster *Peerster) colisionLogicManager(hisCoinFlip int) {
 	//If our coinflip is superior we don´t have to recalculate path
 	if peerster.ColisionInfo.CoinFlip > hisCoinFlip {
-
+		peerster.Winner = true
+		fmt.Println("STAY")
 		//This means that we have to move
 	} else {
+		fmt.Println("MOVERSE")
 		var obstructions []utils.Position
 		// We tell the pathfinding alogirthm that we can't go there
 		obstructions = append(obstructions, peerster.PathCar[1])
@@ -451,6 +470,9 @@ func (peerster *Peerster) colisionLogicManager(hisCoinFlip int) {
 	peerster.ColisionInfo.CoinFlip = 0
 	peerster.ColisionInfo.NumberColisions = 0
 	peerster.ColisionInfo.IPCar = ""
+	if peerster.AreaChangeSession.Active {
+		peerster.AreaChangeSession.Channel <- false
+	}
 }
 
 // Creates a map origin -> want

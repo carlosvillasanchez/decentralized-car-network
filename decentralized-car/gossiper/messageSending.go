@@ -52,6 +52,7 @@ func (peerster *Peerster) SendNegotiationMessage() {
 	colisionMessage := messaging.ColisionResolution{
 		Origin:     peerster.Name,
 		CoinResult: peerster.ColisionInfo.CoinFlip,
+		Position:   peerster.PathCar[1],
 	}
 	packet := messaging.GossipPacket{
 		Colision: &colisionMessage,

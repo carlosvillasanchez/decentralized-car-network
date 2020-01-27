@@ -35,20 +35,38 @@ func (peerster *Peerster) MoveCarPosition() {
 	go func() {
 		for {
 			// fmt.Println(peerster.Newsgroups)
-			fmt.Println(peerster.PathCar)
+			// fmt.Println(peerster.PathCar)
 			// If it is a police car stopped don't do anything
 			time.Sleep(time.Duration(MovementTimer) * time.Second) //TODO moved this out of the if, si that ok?
 			if peerster.PathCar != nil && !peerster.isLastPosition() {
 				areaChange := peerster.changeOfArea()
 				//There is a change in the area zone, so different procedure
 				if areaChange {
-					peerster.sendAreaChangeMessage(peerster.PathCar[1])
+					if peerster.Winner {
+						peerster.Winner = false
+						fmt.Println("HOLAAAAAAAAAAAAAA")
+						peerster.UnsubscribeFromNewsgroup(strconv.Itoa(utils.AreaPositioner(peerster.PathCar[0])))
+						peerster.SubscribeToNewsgroup(strconv.Itoa(utils.AreaPositioner(peerster.PathCar[1])))
+						peerster.positionAdvancer()
+
+						// fmt.Println(peerster.PathCar)
+						// time.Sleep(time.Duration(MovementTimer) * time.Second)
+						// peerster.PathCar = peerster.PathCar[1:]
+						// peerster.BroadcastCarPosition()
+						continue
+					}
 					if !peerster.AreaChangeSession.Active {
-						go peerster.startAreaChangeSession()
+						fmt.Println("CCCCCCCCCCCCCCCCCC")
+						peerster.sendAreaChangeMessage(peerster.PathCar[1])
+						peerster.startAreaChangeSession()
+						continue
 					}
 					peerster.collisionChecker()
+					fmt.Println("number collisions", peerster.ColisionInfo.NumberColisions)
 					if peerster.ColisionInfo.NumberColisions >= 2 {
-
+						fmt.Println("BBBBBBBBBBB")
+						// peerster.AreaChangeSession.Channel <- false
+						peerster.negotationOfColision()
 					}
 				} else {
 					//This function will advance the car to the next position if possible, checking there are not other cars
@@ -71,6 +89,7 @@ func (peerster *Peerster) startAreaChangeSession() {
 			peerster.AreaChangeSession.Active = false
 		}
 	case <-time.After(AreaChangeTimer * time.Second):
+		fmt.Println("CAGADA")
 		peerster.UnsubscribeFromNewsgroup(strconv.Itoa(utils.AreaPositioner(peerster.PathCar[0])))
 		peerster.SubscribeToNewsgroup(strconv.Itoa(utils.AreaPositioner(peerster.PathCar[1])))
 		peerster.positionAdvancer()
@@ -87,6 +106,7 @@ func (peerster *Peerster) changeOfArea() bool {
 	return false
 }
 func (peerster *Peerster) positionAdvancer() {
+	fmt.Println(peerster.PathCar)
 	if peerster.collisionChecker() == false {
 		peerster.PathCar = peerster.PathCar[1:]
 		peerster.BroadcastCarPosition()
@@ -137,7 +157,6 @@ func (peerster *Peerster) negotationOfColision() {
 	//TODO: We have to add that if you are trying to change area,
 	// and another guy from your current area wants to negotiate with you, you always win and stay still
 	coinFlip := peerster.NegotiationCoinflip()
-
 	peerster.ColisionInfo.CoinFlip = coinFlip
 	peerster.SendNegotiationMessage()
 

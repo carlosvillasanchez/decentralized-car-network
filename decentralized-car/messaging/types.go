@@ -109,6 +109,7 @@ type AreaMessage struct {
 type ColisionResolution struct {
 	Origin     string
 	CoinResult int
+	Position   utils.Position
 }
 
 // type Position struct {
