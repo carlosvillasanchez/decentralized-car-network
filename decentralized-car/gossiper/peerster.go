@@ -18,13 +18,14 @@ import (
 type Origin int
 
 const (
-	Client         Origin        = iota
-	Server         Origin        = iota
-	TIMEOUTCARS    time.Duration = 40
-	TIMEOUTSPOTS   time.Duration = 7
-	IMAGEACCIDENT  string        = "accident.jpg"
-	BroadcastTimer int           = 1 //Each 3 second the car broadcast position
-	MovementTimer  int           = 3
+	Client          Origin        = iota
+	Server          Origin        = iota
+	TIMEOUTCARS     time.Duration = 25
+	TIMEOUTSPOTS    time.Duration = 7
+	IMAGEACCIDENT   string        = "accident.jpg"
+	BroadcastTimer  int           = 1 //Each 1 second the car broadcast position
+	MovementTimer   int           = 3
+	AreaChangeTimer time.Duration = 6
 )
 
 type Peerster struct {
@@ -204,7 +205,6 @@ func (peerster *Peerster) handleIncomingRumor(rumor *messaging.RumorMessage, ori
 			fmt.Printf("Warning: Could not send to random peer. Reason: %s \n", err)
 			return ""
 		}
-		fmt.Println(peer, selectedPeer, err)
 		peerster.stopRumormongeringSession(peer)
 		err = peerster.startRumormongeringSession(peer, *rumor)
 		if err != nil {
@@ -321,6 +321,8 @@ func (peerster *Peerster) handleIncomingResolutionM(colisionMessage *messaging.C
 			}
 			peerster.PosCarsInArea.Mutex.RUnlock()
 		}
+		//This is to avoid doing a colision negotiation while one is being performed on us
+		peerster.ColisionInfo.NumberColisions = 0
 		peerster.ColisionInfo.IPCar = addr
 		peerster.ColisionInfo.CoinFlip = coinFlip
 		peerster.SendNegotiationMessage()
@@ -437,19 +439,18 @@ func (peerster *Peerster) spotAssigner() {
 func (peerster *Peerster) colisionLogicManager(hisCoinFlip int) {
 	//If our coinflip is superior we don´t have to recalculate path
 	if peerster.ColisionInfo.CoinFlip > hisCoinFlip {
-		//TODO call move here?
-		return
+
 		//This means that we have to move
 	} else {
 		var obstructions []utils.Position
 		// We tell the pathfinding alogirthm that we can't go there
 		obstructions = append(obstructions, peerster.PathCar[1])
 		peerster.PathCar = CreatePath(peerster.CarMap, peerster.PathCar[0], peerster.PathCar[len(peerster.PathCar)-1], obstructions)
-		//Reset colision object
-		peerster.ColisionInfo.CoinFlip = 0
-		peerster.ColisionInfo.NumberColisions = 0
-		peerster.ColisionInfo.IPCar = ""
 	}
+	//Reset colision object
+	peerster.ColisionInfo.CoinFlip = 0
+	peerster.ColisionInfo.NumberColisions = 0
+	peerster.ColisionInfo.IPCar = ""
 }
 
 // Creates a map origin -> want

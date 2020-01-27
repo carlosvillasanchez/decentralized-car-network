@@ -34,7 +34,7 @@ func (peerster *Peerster) MoveCarPosition() {
 
 	go func() {
 		for {
-			fmt.Println(peerster.Newsgroups)
+			// fmt.Println(peerster.Newsgroups)
 			fmt.Println(peerster.PathCar)
 			// If it is a police car stopped don't do anything
 			time.Sleep(time.Duration(MovementTimer) * time.Second) //TODO moved this out of the if, si that ok?
@@ -43,7 +43,13 @@ func (peerster *Peerster) MoveCarPosition() {
 				//There is a change in the area zone, so different procedure
 				if areaChange {
 					peerster.sendAreaChangeMessage(peerster.PathCar[1])
-					peerster.startAreaChangeSession()
+					if !peerster.AreaChangeSession.Active {
+						go peerster.startAreaChangeSession()
+					}
+					peerster.collisionChecker()
+					if peerster.ColisionInfo.NumberColisions >= 2 {
+
+					}
 				} else {
 					//This function will advance the car to the next position if possible, checking there are not other cars
 					peerster.positionAdvancer()
@@ -58,9 +64,13 @@ func (peerster *Peerster) startAreaChangeSession() {
 	peerster.AreaChangeSession.Active = true
 	//for {
 	select {
-	case <-peerster.AreaChangeSession.Channel:
-		peerster.AreaChangeSession.Active = false
-	case <-time.After(10 * time.Second):
+	case value := <-peerster.AreaChangeSession.Channel:
+		if value {
+			return
+		} else {
+			peerster.AreaChangeSession.Active = false
+		}
+	case <-time.After(AreaChangeTimer * time.Second):
 		peerster.UnsubscribeFromNewsgroup(strconv.Itoa(utils.AreaPositioner(peerster.PathCar[0])))
 		peerster.SubscribeToNewsgroup(strconv.Itoa(utils.AreaPositioner(peerster.PathCar[1])))
 		peerster.positionAdvancer()
@@ -96,13 +106,13 @@ func (peerster *Peerster) collisionChecker() bool {
 	peerster.PosCarsInArea.Mutex.Lock()
 	defer peerster.PosCarsInArea.Mutex.Unlock()
 	for _, carInfo := range peerster.PosCarsInArea.Slice {
-		fmt.Printf("CAR INFO: %+v \n", carInfo)
 		//If a car is in the position we want to move to, there is a collision
 		if peerster.PathCar[1] == carInfo.Position {
 			peerster.ColisionInfo.NumberColisions = peerster.ColisionInfo.NumberColisions + 1
 			peerster.ColisionInfo.IPCar = carInfo.IPCar
 			fmt.Println("-------------------------")
-			fmt.Printf("%+v\n", peerster.PosCarsInArea.Slice)
+			fmt.Println(peerster.ColisionInfo.NumberColisions)
+			fmt.Printf("CAR INFO: %+v \n", carInfo)
 			fmt.Println(peerster.ColisionInfo.IPCar)
 			return true
 		}
