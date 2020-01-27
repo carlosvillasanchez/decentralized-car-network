@@ -106,9 +106,10 @@ func (peerster *Peerster) changeOfArea() bool {
 	return false
 }
 func (peerster *Peerster) positionAdvancer() {
-	fmt.Println(peerster.PathCar)
+
 	if peerster.collisionChecker() == false {
 		peerster.PathCar = peerster.PathCar[1:]
+		fmt.Println(peerster.PathCar)
 		peerster.BroadcastCarPosition()
 		// There is a colision, do something
 	} else {
