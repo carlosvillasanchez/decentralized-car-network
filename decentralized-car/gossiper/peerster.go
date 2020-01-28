@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/dedis/protobuf"
-	"github.com/tormey97/decentralized-car-network/decentralized-car/messaging"
-	"github.com/tormey97/decentralized-car-network/utils"
+	"github.com/carlosvillasanchez/decentralized-car-network/decentralized-car/messaging"
+	"github.com/carlosvillasanchez/decentralized-car-network/utils"
 )
 
 type Origin int
@@ -348,13 +348,16 @@ func (peerster *Peerster) handleIncomingResolutionM(colisionMessage *messaging.C
 	}
 
 }
-func (peerster *Peerster) handleIncomingAccidentMessage(alertToPolice *messaging.AlertPolice) {
+func (peerster *Peerster) handleIncomingAccidentMessage(alertToPolice *messaging.PrivateMessage) {
 	if alertToPolice == nil {
+		return
+	}
+	if alertToPolice.AlertPoliceCar == nil{
 		return
 	}
 	// There has been an accident, so download file and go there
 	file := FileBeingDownloaded{
-		MetafileHash:   alertToPolice.Evidence,
+		MetafileHash:   alertToPolice.AlertPoliceCar.Evidence,
 		Channel:        make(chan messaging.DataReply),
 		CurrentChunk:   0,
 		Metafile:       nil,
@@ -365,13 +368,13 @@ func (peerster *Peerster) handleIncomingAccidentMessage(alertToPolice *messaging
 
 	//Change path
 	// He spawns at the middle
-	startPos := utils.Position{
+	/*startPos := utils.Position{
 		X: 4,
 		Y: 4,
-	}
+	}*/
 	var obstructions []utils.Position
-	peerster.PathCar = CreatePath(peerster.CarMap, startPos, alertToPolice.Position, obstructions)
-	// Now the police car should start movingg
+	peerster.PathCar = CreatePath(peerster.CarMap, peerster.PathCar[0], alertToPolice.AlertPoliceCar.Position, obstructions)
+	// Now the police car should start moving
 }
 
 func (peerster *Peerster) handleIncomingServerAccidentMessage(alertMessage *utils.ServerMessage) {
@@ -381,9 +384,11 @@ func (peerster *Peerster) handleIncomingServerAccidentMessage(alertMessage *util
 	if *alertMessage == (utils.ServerMessage{}) {
 		return
 	}
+	fmt.Println("JOJ", alertMessage.Type, utils.Police)
 	if alertMessage.Type != utils.Police {
 		return
 	}
+	fmt.Println("JEJE")
 	// Notify the police via private message with hops and share the file
 	// Notify the rest of people with rumor monger
 	alert := messaging.AlertPolice{
@@ -393,8 +398,10 @@ func (peerster *Peerster) handleIncomingServerAccidentMessage(alertMessage *util
 	alert.Evidence = peerster.shareFile(IMAGEACCIDENT)
 	alert.Origin = peerster.Name
 	privateAlert := messaging.PrivateMessage{
-		AlertPolice: &alert,
+		AlertPoliceCar: &alert,
+		Destination: "police",
 	}
+	//privateAlert.AlertPolice= &alert
 	peerster.sendNewPrivateMessage(privateAlert)
 }
 func (peerster *Peerster) handleIncomingServerSpotMessage(spotMessage *utils.ServerMessage) {
@@ -512,7 +519,7 @@ func (peerster *Peerster) handleIncomingPrivateMessage(message *messaging.Privat
 	if message.Destination == peerster.Name {
 		fmt.Printf("PRIVATE origin %s hop-limit %v contents %s \n", message.Origin, message.HopLimit, message.Text)
 		peerster.addToPrivateMessages(*message)
-		peerster.handleIncomingAreaChangeResponse(*message.AreaChangeResponse)
+		//peerster.handleIncomingAreaChangeResponse(*message.AreaChangeResponse)
 	} else {
 		message.HopLimit--
 		if message.HopLimit == 0 {
@@ -632,44 +639,50 @@ func (peerster *Peerster) chooseRandomPeer() (string, error) {
 
 // Handles incoming messages from other peers.
 func (peerster *Peerster) serverReceive(buffer []byte, originAddr net.UDPAddr) {
-	receivedPacket := &messaging.GossipPacket{}
-	err := protobuf.Decode(buffer, receivedPacket)
-	if err != nil {
-		fmt.Printf("Error: could not decode packet, reason: %s \n", err)
+	if originAddr.String() != utils.ServerAddress {	
+		receivedPacket := &messaging.GossipPacket{}
+		err := protobuf.Decode(buffer, receivedPacket)
+		if err != nil {
+			fmt.Printf("Error: could not decode packet, reason: %s \n", err)
+		}
+		addr := originAddr.IP.String() + ":" + strconv.Itoa(originAddr.Port)
+		if receivedPacket.Simple != nil && receivedPacket.Simple.RelayPeerAddr != "" {
+			addr = receivedPacket.Simple.RelayPeerAddr
+		}
+		peerster.addToKnownPeers(addr)
+
+		//Function only checked by police car
+		if peerster.Name == utils.Police {
+			peerster.handleIncomingAccidentMessage(receivedPacket.Private)
+		}
+
+		//Function where the cars that won receive the message
+		peerster.handleIncomingSpotWinnerMessage(receivedPacket.Private)
+
+		//Function that handles a colision negotiation message
+		peerster.handleIncomingResolutionM(receivedPacket.Colision, addr)
+		peerster.handleIncomingRumor(receivedPacket.Rumor, originAddr, false)
+
+		//Function that handles position of other cars in area
+		peerster.handleIncomingArea(receivedPacket.Area, addr)
+		peerster.handleIncomingStatusPacket(receivedPacket.Status, originAddr)
+		peerster.handleIncomingPrivateMessage(receivedPacket.Private, originAddr)
+		peerster.handleIncomingDataReply(receivedPacket.DataReply, originAddr)
+		peerster.handleIncomingDataRequest(receivedPacket.DataRequest, originAddr)
+		// peerster.handleIncomingSearchRequest(receivedPacket.SearchRequest, originAddr)
+		// peerster.handleIncomingSearchReply(receivedPacket.SearchReply, originAddr)
+		//peerster.listPeers()
+		
+	}else{
+		receivedPacket := &utils.ServerMessage{}
+		protobuf.Decode(buffer, receivedPacket)
+
+		//Function where the server tells the car if he has entered an accidented zone
+		peerster.handleIncomingServerAccidentMessage(receivedPacket)
+
+		//Function where the server tells the car if he has entered a zone with free spot
+		peerster.handleIncomingServerSpotMessage(receivedPacket)
 	}
-	addr := originAddr.IP.String() + ":" + strconv.Itoa(originAddr.Port)
-	if receivedPacket.Simple != nil && receivedPacket.Simple.RelayPeerAddr != "" {
-		addr = receivedPacket.Simple.RelayPeerAddr
-	}
-
-	peerster.addToKnownPeers(addr)
-
-	//Function only checked by police car
-	if peerster.Name == utils.Police {
-		peerster.handleIncomingAccidentMessage(receivedPacket.Private.AlertPolice)
-	}
-	//Function where the server tells the car if he has entered an accidented zone
-	peerster.handleIncomingServerAccidentMessage(receivedPacket.ServerAlert)
-
-	//Function where the cars that won receive the message
-	peerster.handleIncomingSpotWinnerMessage(receivedPacket.Private)
-
-	//Function where the server tells the car if he has entered a zone with free spot
-	peerster.handleIncomingServerSpotMessage(receivedPacket.ServerAlert)
-
-	//Function that handles a colision negotiation message
-	peerster.handleIncomingResolutionM(receivedPacket.Colision, addr)
-	peerster.handleIncomingRumor(receivedPacket.Rumor, originAddr, false)
-
-	//Function that handles position of other cars in area
-	peerster.handleIncomingArea(receivedPacket.Area, addr)
-	peerster.handleIncomingStatusPacket(receivedPacket.Status, originAddr)
-	peerster.handleIncomingPrivateMessage(receivedPacket.Private, originAddr)
-	peerster.handleIncomingDataReply(receivedPacket.DataReply, originAddr)
-	peerster.handleIncomingDataRequest(receivedPacket.DataRequest, originAddr)
-	// peerster.handleIncomingSearchRequest(receivedPacket.SearchRequest, originAddr)
-	// peerster.handleIncomingSearchReply(receivedPacket.SearchReply, originAddr)
-	//peerster.listPeers()
 }
 
 // For testing, prints the want structure and all received messages just to see if it$s correct
@@ -696,6 +709,7 @@ func (peerster *Peerster) Listen(origin Origin) {
 	if err != nil {
 		log.Fatalf("Error: could not listen. Origin: %s, error: %s \n", origin, err)
 	}
+	fmt.Println("SERVER", Server)
 	if origin == Server {
 		peerster.Conn = conn
 	}

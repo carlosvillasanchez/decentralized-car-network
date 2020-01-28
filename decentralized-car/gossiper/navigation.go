@@ -2,7 +2,7 @@ package gossiper
 
 import (
 	"container/heap"
-	"github.com/tormey97/decentralized-car-network/utils"
+	"github.com/carlosvillasanchez/decentralized-car-network/utils"
 )
 
 /*

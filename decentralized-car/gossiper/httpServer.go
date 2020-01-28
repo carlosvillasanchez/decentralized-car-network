@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/tormey97/decentralized-car-network/decentralized-car/messaging"
+	"github.com/carlosvillasanchez/decentralized-car-network/decentralized-car/messaging"
 )
 
 func (peerster *Peerster) handleNewMessage(w http.ResponseWriter, req *http.Request) {

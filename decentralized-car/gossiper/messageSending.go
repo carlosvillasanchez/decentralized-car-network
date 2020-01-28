@@ -5,14 +5,11 @@ import (
 	"time"
 
 	"github.com/dedis/protobuf"
-	"github.com/tormey97/decentralized-car-network/decentralized-car/messaging"
-	"github.com/tormey97/decentralized-car-network/utils"
+	"github.com/carlosvillasanchez/decentralized-car-network/decentralized-car/messaging"
+	"github.com/carlosvillasanchez/decentralized-car-network/utils"
 )
 
 func (peerster *Peerster) BroadcastCarPosition() {
-	go func() {
-		for {
-			time.Sleep(time.Duration(peerster.BroadcastTimer) * time.Second)
 			areaMessage := messaging.AreaMessage{
 				Origin:   peerster.Name,
 				Position: peerster.PathCar[0],
@@ -32,10 +29,10 @@ func (peerster *Peerster) BroadcastCarPosition() {
 			}
 			peerster.PosCarsInArea.Mutex.RUnlock()
 		}
-	}()
-}
+
 func (peerster *Peerster) SendInfoToServer() {
 	go func() {
+		return
 		for {
 			time.Sleep(time.Duration(peerster.BroadcastTimer) * time.Second)
 
@@ -48,6 +45,15 @@ func (peerster *Peerster) SendInfoToServer() {
 		}
 	}()
 }
+func (peerster *Peerster) SendPosToServer() {
+	packet := utils.ServerNodeMessage{
+		Position: &peerster.PathCar[0],
+	}
+	peerAddr := utils.StringAddrToUDPAddr(utils.ServerAddress)
+	packetBytes, _ := protobuf.Encode(&packet)
+	peerster.Conn.WriteToUDP(packetBytes, &peerAddr)
+}
+
 func (peerster *Peerster) SendNegotiationMessage() {
 	colisionMessage := messaging.ColisionResolution{
 		Origin:     peerster.Name,

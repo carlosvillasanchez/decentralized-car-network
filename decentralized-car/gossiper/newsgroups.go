@@ -1,6 +1,6 @@
 package gossiper
 
-import "github.com/tormey97/decentralized-car-network/decentralized-car/messaging"
+import "github.com/carlosvillasanchez/decentralized-car-network/decentralized-car/messaging"
 
 /*
 This module is responsible for subscribing to Newsgroups. Need a function to subscribe, unsubscribe.

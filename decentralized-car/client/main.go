@@ -1,10 +1,10 @@
-package main
+package carDecentralized
 
 import (
 	"flag"
 	"fmt"
 	"github.com/dedis/protobuf"
-	"github.com/tormey97/Peerster/messaging"
+	"github.com/carlosvillasanchez/decentralized-car-network/decentralized-car/messaging"
 	"log"
 	"net"
 	"strings"

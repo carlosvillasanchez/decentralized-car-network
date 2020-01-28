@@ -4,7 +4,7 @@ import (
 	"log"
 	"net"
 
-	"github.com/tormey97/decentralized-car-network/utils"
+	"github.com/carlosvillasanchez/decentralized-car-network/utils"
 )
 
 func createConnection(addr string) (*net.UDPConn, error) {

@@ -3,7 +3,7 @@ package messaging
 import (
 	"sync"
 
-	"github.com/tormey97/decentralized-car-network/utils"
+	"github.com/carlosvillasanchez/decentralized-car-network/utils"
 )
 
 type SimpleMessage struct {
@@ -18,10 +18,9 @@ type PrivateMessage struct {
 	Text        string
 	Destination string
 	HopLimit    uint32
-	*AreaChangeResponse
-	*AlertPolice
-	*SpotPublicationRequest
-	*SpotPublicationWinner
+    AlertPoliceCar *AlertPolice
+	SpotPublicationRequest *SpotPublicationRequest
+	SpotPublicationWinner *SpotPublicationWinner
 }
 
 type GossipPacket struct {
@@ -41,7 +40,7 @@ type GossipPacket struct {
 type AreaChangeResponse struct {
 }
 type AlertPolice struct {
-	utils.Position
+	Position utils.Position
 	Origin   string
 	Evidence []byte
 }

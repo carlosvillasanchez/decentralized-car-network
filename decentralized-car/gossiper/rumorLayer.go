@@ -5,8 +5,8 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/tormey97/decentralized-car-network/decentralized-car/messaging"
-	"github.com/tormey97/decentralized-car-network/utils"
+	"github.com/carlosvillasanchez/decentralized-car-network/decentralized-car/messaging"
+	"github.com/carlosvillasanchez/decentralized-car-network/utils"
 )
 
 type AreaChangeSession struct {

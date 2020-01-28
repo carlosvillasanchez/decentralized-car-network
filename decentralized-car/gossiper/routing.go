@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/tormey97/decentralized-car-network/decentralized-car/messaging"
+	"github.com/carlosvillasanchez/decentralized-car-network/decentralized-car/messaging"
 )
 
 func (peerster *Peerster) addToNextHopTable(rumor messaging.RumorMessage, originAddr string) {

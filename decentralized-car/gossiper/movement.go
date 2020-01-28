@@ -11,14 +11,14 @@ import (
 	// 	"time"
 
 	// 	"github.com/dedis/protobuf"
-	// 	"github.com/tormey97/decentralized-car-network/decentralized-car/messaging"
+	// 	"github.com/carlosvillasanchez/decentralized-car-network/decentralized-car/messaging"
 
 	"fmt"
 	"math/rand"
 	"strconv"
 	"time"
 
-	"github.com/tormey97/decentralized-car-network/utils"
+	"github.com/carlosvillasanchez/decentralized-car-network/utils"
 )
 
 const MaxCoinflip = 7000
@@ -111,6 +111,7 @@ func (peerster *Peerster) positionAdvancer() {
 		peerster.PathCar = peerster.PathCar[1:]
 		fmt.Println(peerster.PathCar)
 		peerster.BroadcastCarPosition()
+		peerster.SendPosToServer()
 		// There is a colision, do something
 	} else {
 		//If there has been more than 2 colision, negotiate

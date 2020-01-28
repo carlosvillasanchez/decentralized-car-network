@@ -5,10 +5,10 @@ import (
 	"net"
 	"strconv"
 	"strings"
-	// "github.com/tormey97/decentralized-car-network/simulator"
+	// "github.com/carlosvillasanchez/decentralized-car-network/simulator"
 )
 
-const ServerAddress string = "127.0.0.1:8888"
+const ServerAddress string = "127.0.0.1:5999"
 const MaxBufferSize = 65536
 
 func ReadFromConnection(conn net.UDPConn) ([]byte, *net.UDPAddr, error) {
