@@ -205,6 +205,8 @@ func (peerster *Peerster) handleIncomingRumor(rumor *messaging.RumorMessage, ori
 		peer = selectedPeer
 		if err != nil {
 			fmt.Printf("Warning: Could not send to random peer. Reason: %s \n", err)
+			fmt.Println("peer: ", peer)
+			fmt.Printf("%+v\n", messaging.GossipPacket{Rumor: rumor})
 			return ""
 		}
 		peerster.stopRumormongeringSession(peer)
@@ -265,7 +267,7 @@ func (peerster *Peerster) handleIncomingArea(areaMessage *messaging.AreaMessage,
 func (peerster *Peerster) SaveCarInAreaStructure(origin string, position utils.Position, IPofCar string) {
 	peerster.PosCarsInArea.Mutex.RLock()
 	for _, car := range peerster.PosCarsInArea.Slice {
-		if car.Origin == origin {
+		if car.IPCar == IPofCar {
 			peerster.PosCarsInArea.Mutex.RUnlock()
 			return // car already exists
 		}
@@ -313,7 +315,6 @@ func (peerster *Peerster) handleIncomingResolutionM(colisionMessage *messaging.C
 	}
 	// If he is asking for another position, we ignore him
 	if (colisionMessage.Position != peerster.PathCar[0]) && (colisionMessage.Position.X != -1) {
-		fmt.Println("position", colisionMessage.Position)
 		peerster.ColisionInfo.IPCar = addr
 		peerster.ColisionInfo.CoinFlip = -1
 		peerster.SendNegotiationMessage()
@@ -335,7 +336,7 @@ func (peerster *Peerster) handleIncomingResolutionM(colisionMessage *messaging.C
 			for _, v := range peerster.PosCarsInArea.Slice {
 				if v.Origin == colisionMessage.Origin {
 					// If the car sending the coinflip is in our area, we win the coinflip
-					if utils.AreaPositioner(v.Position) == utils.AreaPositioner(peerster.Position) {
+					if utils.AreaPositioner(v.Position) == utils.AreaPositioner(peerster.PathCar[0]) {
 						coinFlip = MaxCoinflip + 1
 					}
 				}

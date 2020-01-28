@@ -47,10 +47,11 @@ func createPeerster(gossipAddr *string, mapString *string, name *string, peers *
 	areaPeersList := []string{}
 	if *areaPeers != "" {
 		areaPeersList = strings.Split(*areaPeers, ",")
-	}
 
+	}
+	fmt.Println("prueba", areaPeersList)
 	// Creation of the map, if empty put the empty map
-	var carMap [9][9]utils.Square
+	var carMap [10][10]utils.Square
 	if *mapString == "" {
 		carMap = utils.StringToCarMap(utils.ArrayStringToString(emptyMap))
 	} else {
@@ -129,6 +130,10 @@ func init() {
 
 func Start(gossipAddr *string, mapString *string, name *string, peers *string, antiEntropy *int, rTimer *int, startPosition *string, endPosition *string, areaPeers *string, parkingSearch *bool) {
 	peerster := createPeerster(gossipAddr, mapString, name, peers, antiEntropy, rTimer, startPosition, endPosition, areaPeers)
+	fmt.Println(*name)
+	for _, value := range peerster.PosCarsInArea.Slice {
+		fmt.Printf("%+v\n", value)
+	}
 	peerster.SubscribeToNewsgroup(strconv.Itoa(utils.AreaPositioner(peerster.PathCar[0])))
 	if *parkingSearch {
 		peerster.SubscribeToNewsgroup(gossiper.ParkingNewsGroup)

@@ -3,18 +3,21 @@ package main
 import (
 	"fmt"
 	//"github.com/tormey97/decentralized-car-network/utils"
-	"github.com/tormey97/decentralized-car-network/decentralized-car"
 	"net/http"
 	"strconv"
 	"strings"
+
+	carDecentralized "github.com/tormey97/decentralized-car-network/decentralized-car"
+
 	//"math/rand"
 	//"encoding/json"
 	"bytes"
-	"github.com/dedis/protobuf"
 	"net"
 	"os/exec"
 	"sync"
 	"time"
+
+	"github.com/dedis/protobuf"
 )
 
 const (
@@ -32,7 +35,7 @@ type CentralServer struct {
 	Buildings    []Building
 	ParkingSpots []ParkingSpot
 	CarCrashes   []CarCrash
-	Map          [9][9]string
+	Map          [10][10]string
 	mapMutex     sync.RWMutex
 	conn         *net.UDPConn
 	Police       bool
@@ -271,7 +274,7 @@ func (centralServer *CentralServer) startNodes() {
 			peers := centralServer.Cars[ids[0]].IP + ":" + centralServer.Cars[ids[0]].Port
 			flags_aux = append(flags_aux, peers)
 		} else {
-			peers := centralServer.Cars[ids[len(ids)-1]].IP + ":" + centralServer.Cars[ids[len(ids)-1]].Port
+			peers := centralServer.Cars[ids[len(ids)-1]].IP + ":" + centralServer.Cars[ids[len(ids)-1]].Port + ","
 			peers += centralServer.Cars[ids[len(ids)-2]].IP + ":" + centralServer.Cars[ids[len(ids)-2]].Port
 			flags_aux = append(flags_aux, peers)
 		}
@@ -327,27 +330,14 @@ func (centralServer *CentralServer) startNode(flags []string, areas map[string][
 			neighbours += addrs + ","
 		}
 	}
+	if len(neighbours) != 0 {
+		neighbours = neighbours[:len(neighbours)-1]
+	}
 	fmt.Println("NODE", flags[2], "POS", flags[6], "AREA", flags[8], "NEIGHBOURS", neighbours, "PARKING", parking)
-	/*var gossipAddr *string
-	*gossipAddr = flags[0]
-	var mapString *string
-	*mapString = flags[1]
-	var name *string
-	*name = flags[2]
-	var peers *string
-	*peers = flags[3]
-	var antiEntropy *int
-	*antiEntropy, _ = strconv.Atoi(flags[4])
-	var rTimer *int
-	*rTimer, _ = strconv.Atoi(flags[5])
-	var startPosition *string
-	*startPosition = flags[6]
-	var endPosition *string
-	*endPosition = flags[7]
-	go carDecentralized.Start(gossipAddr, mapString, name, peers, antiEntropy, rTimer, startPosition, endPosition) */
+
 	antiEntropy, _ := strconv.Atoi(flags[4])
 	rTimer, _ := strconv.Atoi(flags[5])
-	go carDecentralized.Start(&flags[0], &flags[1], &flags[2], &flags[3], &antiEntropy, &rTimer, &flags[6], &flags[7], &neighbours, &parking)
+	carDecentralized.Start(&flags[0], &flags[1], &flags[2], &flags[3], &antiEntropy, &rTimer, &flags[6], &flags[7], &neighbours, &parking)
 
 }
 
