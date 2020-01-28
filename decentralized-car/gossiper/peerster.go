@@ -345,6 +345,10 @@ func (peerster *Peerster) handleIncomingResolutionM(colisionMessage *messaging.C
 		}
 		peerster.ColisionInfo.IPCar = addr
 		peerster.ColisionInfo.CoinFlip = coinFlip
+		peerster.SendTrace(utils.MessageTrace{
+			Type: utils.Crash,
+			Text: fmt.Sprintf("Received conflict message, responding with coinflip %v", coinFlip),
+		})
 		peerster.SendNegotiationMessage()
 		fmt.Println(colisionMessage.Origin, "Collision message ????? ")
 		peerster.colisionLogicManager(colisionMessage.CoinResult)
@@ -368,7 +372,10 @@ func (peerster *Peerster) handleIncomingAccidentMessage(alertToPolice *messaging
 		FileName:       "accident.jpg",
 	}
 	peerster.downloadData([]string{alertToPolice.Origin}, file)
-
+	peerster.SendTrace(utils.MessageTrace{
+		Type: utils.Crash,
+		Text: fmt.Sprintf("Received a report of an accident from %s at position %v", alertToPolice.AlertPoliceCar.Origin, alertToPolice.AlertPoliceCar.Position),
+	})
 	//Change path
 	// He spawns at the middle
 	/*startPos := utils.Position{
@@ -404,6 +411,11 @@ func (peerster *Peerster) handleIncomingServerAccidentMessage(alertMessage *util
 		AlertPoliceCar: &alert,
 		Destination:    "police",
 	}
+
+	peerster.SendTrace(utils.MessageTrace{
+		Type: utils.Crash,
+		Text: fmt.Sprintf("Detected an accident at %v, sending report to police", peerster.PathCar[0]),
+	})
 	//privateAlert.AlertPolice= &alert
 	peerster.sendNewPrivateMessage(privateAlert)
 }
@@ -420,6 +432,11 @@ func (peerster *Peerster) handleIncomingServerSpotMessage(spotMessage *utils.Ser
 	//TODO: Publish the spot in the newsgroup and initiate a session if someone wants to ask for the spot
 	fmt.Println("AAAAA_")
 	go peerster.spotAssigner()
+	currentPosition := peerster.PathCar[0]
+	peerster.SendTrace(utils.MessageTrace{
+		Type: utils.Parking,
+		Text: fmt.Sprintf("Parking spot found at %v, %v ", currentPosition.X, currentPosition.Y),
+	})
 	peerster.SendFreeSpotMessage()
 
 }
@@ -434,6 +451,10 @@ func (peerster *Peerster) handleIncomingSpotWinnerMessage(winnerAssigment *messa
 		return
 	}
 	//Your are the winner so you change your path to the spot
+	peerster.SendTrace(utils.MessageTrace{
+		Type: utils.Parking,
+		Text: fmt.Sprintf("Won parking spot at %v, %v ", winnerAssigment.SpotPublicationWinner.Position.X, winnerAssigment.SpotPublicationWinner.Position.Y),
+	})
 	var obstructions []utils.Position
 	peerster.PathCar = CreatePath(peerster.CarMap, peerster.PathCar[0], winnerAssigment.SpotPublicationWinner.Position, obstructions)
 }
@@ -474,6 +495,11 @@ func (peerster *Peerster) spotAssigner() {
 			Destination:           winnerSpot.Origin,
 			SpotPublicationWinner: &spotPublicationWinner,
 		}
+
+		peerster.SendTrace(utils.MessageTrace{
+			Type: utils.Crash,
+			Text: fmt.Sprintf("Decided parking spot winner: %s", winnerSpot.Origin),
+		})
 		fmt.Println("PARK", privateAlert)
 		peerster.sendNewPrivateMessage(privateAlert)
 		peerster.CarsInterestedSpot.SaveSpots = false
@@ -483,11 +509,19 @@ func (peerster *Peerster) spotAssigner() {
 func (peerster *Peerster) colisionLogicManager(hisCoinFlip int) {
 	//If our coinflip is superior we don´t have to recalculate path
 	if peerster.ColisionInfo.CoinFlip > hisCoinFlip {
+		peerster.SendTrace(utils.MessageTrace{
+			Type: utils.Crash,
+			Text: fmt.Sprintf("Won conflict resolution coinflip. My coinflip: %v, their coinflip: %v", peerster.ColisionInfo.CoinFlip, hisCoinFlip),
+		})
 		peerster.Winner = true
 		fmt.Println("STAY")
 		//This means that we have to move
 	} else {
 		fmt.Println("MOVERSE")
+		peerster.SendTrace(utils.MessageTrace{
+			Type: utils.Crash,
+			Text: fmt.Sprintf("Lost conflict resolution coinflip. My coinflip: %v, their coinflip: %v", peerster.ColisionInfo.CoinFlip, hisCoinFlip),
+		})
 		var obstructions []utils.Position
 		// We tell the pathfinding alogirthm that we can't go there
 		obstructions = append(obstructions, peerster.PathCar[1])

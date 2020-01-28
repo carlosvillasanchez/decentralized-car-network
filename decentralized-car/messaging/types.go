@@ -13,14 +13,14 @@ type SimpleMessage struct {
 }
 
 type PrivateMessage struct {
-	Origin      string
-	ID          uint32
-	Text        string
-	Destination string
-	HopLimit    uint32
-    AlertPoliceCar *AlertPolice
+	Origin                 string
+	ID                     uint32
+	Text                   string
+	Destination            string
+	HopLimit               uint32
+	AlertPoliceCar         *AlertPolice
 	SpotPublicationRequest *SpotPublicationRequest
-	SpotPublicationWinner *SpotPublicationWinner
+	SpotPublicationWinner  *SpotPublicationWinner
 }
 
 type GossipPacket struct {

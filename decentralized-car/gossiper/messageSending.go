@@ -2,6 +2,7 @@ package gossiper
 
 import (
 	"fmt"
+	utils2 "github.com/tormey97/decentralized-car-network/utils"
 	"time"
 
 	"github.com/dedis/protobuf"
@@ -10,38 +11,42 @@ import (
 )
 
 func (peerster *Peerster) BroadcastCarPosition() {
-			areaMessage := messaging.AreaMessage{
-				Origin:   peerster.Name,
-				Position: peerster.PathCar[0],
-			}
-			packet := messaging.GossipPacket{
-				Area: &areaMessage,
-			}
-			var blacklist []string
+	areaMessage := messaging.AreaMessage{
+		Origin:   peerster.Name,
+		Position: peerster.PathCar[0],
+	}
+	packet := messaging.GossipPacket{
+		Area: &areaMessage,
+	}
+	var blacklist []string
 
-			peerster.PosCarsInArea.Mutex.RLock()
-			for i := range peerster.PosCarsInArea.Slice {
-				peer := peerster.PosCarsInArea.Slice[i].IPCar
-				err := peerster.sendToPeer(peer, packet, blacklist)
-				if err != nil {
-					fmt.Printf("Could not send to peer %q, reason: %s \n", peer, err)
-				}
-			}
-			peerster.PosCarsInArea.Mutex.RUnlock()
+	peerster.PosCarsInArea.Mutex.RLock()
+	for i := range peerster.PosCarsInArea.Slice {
+		peer := peerster.PosCarsInArea.Slice[i].IPCar
+		err := peerster.sendToPeer(peer, packet, blacklist)
+		if err != nil {
+			fmt.Printf("Could not send to peer %q, reason: %s \n", peer, err)
 		}
+	}
+	peerster.PosCarsInArea.Mutex.RUnlock()
+
+}
+
+func (peerster *Peerster) SendTrace(trace utils2.MessageTrace) {
+	packet := utils.ServerNodeMessage{
+		Position: nil,
+		Trace:    &trace,
+	}
+	addr := utils.StringAddrToUDPAddr(utils.ServerAddress)
+	packetBytes, _ := protobuf.Encode(&packet)
+	peerster.Conn.WriteToUDP(packetBytes, &addr)
+}
 
 func (peerster *Peerster) SendInfoToServer() {
 	go func() {
-		return
 		for {
 			time.Sleep(time.Duration(peerster.BroadcastTimer) * time.Second)
 
-			packet := utils.ServerNodeMessage{
-				Position: &peerster.PathCar[0],
-			}
-			peerAddr := utils.StringAddrToUDPAddr(utils.ServerAddress)
-			packetBytes, _ := protobuf.Encode(&packet)
-			peerster.Conn.WriteToUDP(packetBytes, &peerAddr)
 		}
 	}()
 }
@@ -63,7 +68,7 @@ func (peerster *Peerster) SendNegotiationMessage() {
 			Position:   peerster.PathCar[1],
 		}
 		// If we are stopped we will send our current position
-	}else{
+	} else {
 		positionAux := utils.Position{
 			X: -1,
 			Y: -1,
