@@ -5,7 +5,7 @@ import (
 	"net"
 	"strconv"
 	"strings"
-	// "github.com/carlosvillasanchez/decentralized-car-network/simulator"
+	// "github.com/tormey97/decentralized-car-network/simulator"
 )
 
 const ServerAddress string = "127.0.0.1:5999"
@@ -50,17 +50,17 @@ func StringAddrToUDPAddr(addr string) net.UDPAddr {
 }
 
 // This function takes a string of the map and transforms it to a matrix of Square objects
-func StringToCarMap(stringFlag string) [9][9]Square {
+func StringToCarMap(stringFlag string) [10][10]Square {
 	var squareType Square
 	// make([]int, 0, 5)
-	var carGrid [9][9]Square
+	var carGrid [10][10]Square
 	// var carMap = Grid
-	for i := 0; i < 9; i++ {
-		stringSplit := strings.SplitN(stringFlag, ",", 10)
-		if i != 8 {
-			stringFlag = stringSplit[9]
+	for i := 0; i < 10; i++ {
+		stringSplit := strings.SplitN(stringFlag, ",", 11)
+		if i != 9 {
+			stringFlag = stringSplit[10]
 		}
-		for j, square := range stringSplit[:9] {
+		for j, square := range stringSplit[:10] {
 			squareType.Type = square
 			carGrid[i][j] = squareType
 		}
@@ -147,11 +147,11 @@ func AreaPositioner(position Position) int {
 	switch {
 	case position.X < 5 && position.Y < 5:
 		return 1
-	case position.X < 9 && position.Y < 5:
+	case position.X < 10 && position.Y < 5:
 		return 2
-	case position.X < 5 && position.Y < 9:
+	case position.X < 5 && position.Y < 10:
 		return 3
-	case position.X < 9 && position.Y < 9:
+	case position.X < 10 && position.Y < 10:
 		return 4
 	default:
 		return -1

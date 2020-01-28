@@ -2,7 +2,7 @@ package gossiper
 
 import (
 	"container/heap"
-	"github.com/carlosvillasanchez/decentralized-car-network/utils"
+	"github.com/tormey97/decentralized-car-network/utils"
 )
 
 /*
@@ -96,7 +96,7 @@ func CreatePath(
 	obstructions []utils.Position) []utils.Position {
 	simulatedMap.RLock()
 	defer simulatedMap.RUnlock()
-	distances := [9][9]pathfindingNode{}
+	distances := [10][10]pathfindingNode{}
 	distances[startPos.X][startPos.Y].Position = startPos
 	openSet := nodePriorityQueue{toPathfindingNode(startPos)}
 	closedSet := nodePriorityQueue{}

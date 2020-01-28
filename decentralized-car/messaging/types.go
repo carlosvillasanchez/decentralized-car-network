@@ -3,7 +3,7 @@ package messaging
 import (
 	"sync"
 
-	"github.com/carlosvillasanchez/decentralized-car-network/utils"
+	"github.com/tormey97/decentralized-car-network/utils"
 )
 
 type SimpleMessage struct {

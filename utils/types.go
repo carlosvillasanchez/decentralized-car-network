@@ -55,7 +55,7 @@ type Square struct { // One grid/square in the map
 
 type SimulatedMap struct { // The entire simulated map
 	sync.RWMutex
-	Grid [9][9]Square // Matrix representing the whole map
+	Grid [10][10]Square // Matrix representing the whole map
 }
 type ColisionInformation struct {
 	NumberColisions int

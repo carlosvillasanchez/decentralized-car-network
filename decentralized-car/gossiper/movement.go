@@ -11,14 +11,14 @@ import (
 	// 	"time"
 
 	// 	"github.com/dedis/protobuf"
-	// 	"github.com/carlosvillasanchez/decentralized-car-network/decentralized-car/messaging"
+	// 	"github.com/tormey97/decentralized-car-network/decentralized-car/messaging"
 
 	"fmt"
 	"math/rand"
 	"strconv"
 	"time"
 
-	"github.com/carlosvillasanchez/decentralized-car-network/utils"
+	"github.com/tormey97/decentralized-car-network/utils"
 )
 
 const MaxCoinflip = 7000
@@ -37,14 +37,18 @@ func (peerster *Peerster) MoveCarPosition() {
 			// fmt.Println(peerster.Newsgroups)
 			// fmt.Println(peerster.PathCar)
 			// If it is a police car stopped don't do anything
+
 			time.Sleep(time.Duration(MovementTimer) * time.Second) //TODO moved this out of the if, si that ok?
+			fmt.Println("Pepe", peerster.Name)
+			for _, value := range peerster.PosCarsInArea.Slice {
+				fmt.Printf("%+v\n", value)
+			}
 			if peerster.PathCar != nil && !peerster.isLastPosition() {
 				areaChange := peerster.changeOfArea()
 				//There is a change in the area zone, so different procedure
 				if areaChange {
 					if peerster.Winner {
 						peerster.Winner = false
-						fmt.Println("HOLAAAAAAAAAAAAAA")
 						peerster.UnsubscribeFromNewsgroup(strconv.Itoa(utils.AreaPositioner(peerster.PathCar[0])))
 						peerster.SubscribeToNewsgroup(strconv.Itoa(utils.AreaPositioner(peerster.PathCar[1])))
 						peerster.positionAdvancer()

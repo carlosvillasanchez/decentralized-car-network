@@ -11,22 +11,22 @@ import (
 	"time"
 
 	"github.com/dedis/protobuf"
-	"github.com/carlosvillasanchez/decentralized-car-network/decentralized-car/messaging"
-	"github.com/carlosvillasanchez/decentralized-car-network/utils"
+	"github.com/tormey97/decentralized-car-network/decentralized-car/messaging"
+	"github.com/tormey97/decentralized-car-network/utils"
 )
 
 type Origin int
 
 const (
-	Client          Origin        = iota
-	Server          Origin        = iota
-	TIMEOUTCARS     time.Duration = 30
-	TIMEOUTSPOTS    time.Duration = 5
-	IMAGEACCIDENT   string        = "accident.jpg"
-	BroadcastTimer  int           = 1 //Each 1 second the car broadcast position
-	MovementTimer   int           = 3
-	AreaChangeTimer time.Duration = 6
-	ParkingNewsGroup string = "parking"
+	Client           Origin        = iota
+	Server           Origin        = iota
+	TIMEOUTCARS      time.Duration = 30
+	TIMEOUTSPOTS     time.Duration = 5
+	IMAGEACCIDENT    string        = "accident.jpg"
+	BroadcastTimer   int           = 1 //Each 1 second the car broadcast position
+	MovementTimer    int           = 3
+	AreaChangeTimer  time.Duration = 6
+	ParkingNewsGroup string        = "parking"
 )
 
 type Peerster struct {
@@ -205,6 +205,8 @@ func (peerster *Peerster) handleIncomingRumor(rumor *messaging.RumorMessage, ori
 		peer = selectedPeer
 		if err != nil {
 			fmt.Printf("Warning: Could not send to random peer. Reason: %s \n", err)
+			fmt.Println("peer: ", peer)
+			fmt.Printf("%+v\n", messaging.GossipPacket{Rumor: rumor})
 			return ""
 		}
 		peerster.stopRumormongeringSession(peer)
@@ -265,7 +267,7 @@ func (peerster *Peerster) handleIncomingArea(areaMessage *messaging.AreaMessage,
 func (peerster *Peerster) SaveCarInAreaStructure(origin string, position utils.Position, IPofCar string) {
 	peerster.PosCarsInArea.Mutex.RLock()
 	for _, car := range peerster.PosCarsInArea.Slice {
-		if car.Origin == origin {
+		if car.IPCar == IPofCar {
 			peerster.PosCarsInArea.Mutex.RUnlock()
 			return // car already exists
 		}
@@ -312,8 +314,7 @@ func (peerster *Peerster) handleIncomingResolutionM(colisionMessage *messaging.C
 		return
 	}
 	// If he is asking for another position, we ignore him
-	if (colisionMessage.Position != peerster.PathCar[0]) && (colisionMessage.Position.X != -1 ) {
-		fmt.Println("position", colisionMessage.Position)
+	if (colisionMessage.Position != peerster.PathCar[0]) && (colisionMessage.Position.X != -1) {
 		peerster.ColisionInfo.IPCar = addr
 		peerster.ColisionInfo.CoinFlip = -1
 		peerster.SendNegotiationMessage()
@@ -335,7 +336,7 @@ func (peerster *Peerster) handleIncomingResolutionM(colisionMessage *messaging.C
 			for _, v := range peerster.PosCarsInArea.Slice {
 				if v.Origin == colisionMessage.Origin {
 					// If the car sending the coinflip is in our area, we win the coinflip
-					if utils.AreaPositioner(v.Position) == utils.AreaPositioner(peerster.Position) {
+					if utils.AreaPositioner(v.Position) == utils.AreaPositioner(peerster.PathCar[0]) {
 						coinFlip = MaxCoinflip + 1
 					}
 				}
@@ -354,7 +355,7 @@ func (peerster *Peerster) handleIncomingAccidentMessage(alertToPolice *messaging
 	if alertToPolice == nil {
 		return
 	}
-	if alertToPolice.AlertPoliceCar == nil{
+	if alertToPolice.AlertPoliceCar == nil {
 		return
 	}
 	// There has been an accident, so download file and go there
@@ -401,7 +402,7 @@ func (peerster *Peerster) handleIncomingServerAccidentMessage(alertMessage *util
 	alert.Origin = peerster.Name
 	privateAlert := messaging.PrivateMessage{
 		AlertPoliceCar: &alert,
-		Destination: "police",
+		Destination:    "police",
 	}
 	//privateAlert.AlertPolice= &alert
 	peerster.sendNewPrivateMessage(privateAlert)
@@ -446,14 +447,14 @@ func (peerster *Peerster) handleIncomingSpotRequestMessage(request *messaging.Pr
 	if request.SpotPublicationRequest == nil {
 		return
 	}
-	peerster.CarsInterestedSpot.Requests = append(peerster.CarsInterestedSpot.Requests,*request)
+	peerster.CarsInterestedSpot.Requests = append(peerster.CarsInterestedSpot.Requests, *request)
 }
 func (peerster *Peerster) spotAssigner() {
 	peerster.CarsInterestedSpot.SaveSpots = true
 	time.Sleep(time.Duration(TIMEOUTSPOTS) * time.Second)
 	//Now we should have all the request, so we have to assign a winner of the spot
 	carsWantingSpot := len(peerster.CarsInterestedSpot.Requests)
-	fmt.Println("CCCCCCCCCCCC",carsWantingSpot)
+	fmt.Println("CCCCCCCCCCCC", carsWantingSpot)
 	if carsWantingSpot > 0 {
 		min := 0
 		max := carsWantingSpot - 1
@@ -461,7 +462,7 @@ func (peerster *Peerster) spotAssigner() {
 
 		//The winner is
 		winnerSpot := peerster.CarsInterestedSpot.Requests[coinFlip]
-		fmt.Println("BBBBBBBB",winnerSpot)
+		fmt.Println("BBBBBBBB", winnerSpot)
 		//Send private message to the winner
 		spotPublicationWinner := messaging.SpotPublicationWinner{
 			Position: winnerSpot.SpotPublicationRequest.Position,
@@ -658,7 +659,7 @@ func (peerster *Peerster) chooseRandomPeer() (string, error) {
 
 // Handles incoming messages from other peers.
 func (peerster *Peerster) serverReceive(buffer []byte, originAddr net.UDPAddr) {
-	if originAddr.String() != utils.ServerAddress {	
+	if originAddr.String() != utils.ServerAddress {
 		receivedPacket := &messaging.GossipPacket{}
 		err := protobuf.Decode(buffer, receivedPacket)
 		if err != nil {
@@ -694,8 +695,8 @@ func (peerster *Peerster) serverReceive(buffer []byte, originAddr net.UDPAddr) {
 		// peerster.handleIncomingSearchRequest(receivedPacket.SearchRequest, originAddr)
 		// peerster.handleIncomingSearchReply(receivedPacket.SearchReply, originAddr)
 		//peerster.listPeers()
-		
-	}else{
+
+	} else {
 		receivedPacket := &utils.ServerMessage{}
 		protobuf.Decode(buffer, receivedPacket)
 
