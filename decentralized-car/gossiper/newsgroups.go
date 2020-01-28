@@ -1,7 +1,7 @@
 package gossiper
 
 import "github.com/carlosvillasanchez/decentralized-car-network/decentralized-car/messaging"
-
+import "fmt"
 /*
 This module is responsible for subscribing to Newsgroups. Need a function to subscribe, unsubscribe.
 Need to add to peerster a list of subscriptions.
@@ -22,8 +22,10 @@ func (peerster *Peerster) SubscribeToNewsgroup(newsgroup string) {
 // unsubscribes from a newsgroup
 func (peerster *Peerster) UnsubscribeFromNewsgroup(newsgroup string) {
 	for i := range peerster.Newsgroups {
+		fmt.Println("Number", i)
 		if peerster.Newsgroups[i] == newsgroup {
 			peerster.Newsgroups = append(peerster.Newsgroups[:i], peerster.Newsgroups[i+1:]...)
+			break
 		}
 	}
 }

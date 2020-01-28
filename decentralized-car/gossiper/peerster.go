@@ -21,11 +21,12 @@ const (
 	Client          Origin        = iota
 	Server          Origin        = iota
 	TIMEOUTCARS     time.Duration = 30
-	TIMEOUTSPOTS    time.Duration = 7
+	TIMEOUTSPOTS    time.Duration = 5
 	IMAGEACCIDENT   string        = "accident.jpg"
 	BroadcastTimer  int           = 1 //Each 1 second the car broadcast position
 	MovementTimer   int           = 3
 	AreaChangeTimer time.Duration = 6
+	ParkingNewsGroup string = "parking"
 )
 
 type Peerster struct {
@@ -310,7 +311,8 @@ func (peerster *Peerster) handleIncomingResolutionM(colisionMessage *messaging.C
 	if *colisionMessage == (messaging.ColisionResolution{}) {
 		return
 	}
-	if colisionMessage.Position != peerster.PathCar[0] {
+	// If he is asking for another position, we ignore him
+	if (colisionMessage.Position != peerster.PathCar[0]) && (colisionMessage.Position.X != -1 ) {
 		fmt.Println("position", colisionMessage.Position)
 		peerster.ColisionInfo.IPCar = addr
 		peerster.ColisionInfo.CoinFlip = -1
@@ -415,7 +417,10 @@ func (peerster *Peerster) handleIncomingServerSpotMessage(spotMessage *utils.Ser
 		return
 	}
 	//TODO: Publish the spot in the newsgroup and initiate a session if someone wants to ask for the spot
+	fmt.Println("AAAAA_")
 	go peerster.spotAssigner()
+	peerster.SendFreeSpotMessage()
+
 }
 func (peerster *Peerster) handleIncomingSpotWinnerMessage(winnerAssigment *messaging.PrivateMessage) {
 	if winnerAssigment == nil {
@@ -431,12 +436,24 @@ func (peerster *Peerster) handleIncomingSpotWinnerMessage(winnerAssigment *messa
 	var obstructions []utils.Position
 	peerster.PathCar = CreatePath(peerster.CarMap, peerster.PathCar[0], winnerAssigment.SpotPublicationWinner.Position, obstructions)
 }
+func (peerster *Peerster) handleIncomingSpotRequestMessage(request *messaging.PrivateMessage) {
+	if request == nil {
+		return
+	}
+	if *request == (messaging.PrivateMessage{}) {
+		return
+	}
+	if request.SpotPublicationRequest == nil {
+		return
+	}
+	peerster.CarsInterestedSpot.Requests = append(peerster.CarsInterestedSpot.Requests,*request)
+}
 func (peerster *Peerster) spotAssigner() {
 	peerster.CarsInterestedSpot.SaveSpots = true
 	time.Sleep(time.Duration(TIMEOUTSPOTS) * time.Second)
-
 	//Now we should have all the request, so we have to assign a winner of the spot
 	carsWantingSpot := len(peerster.CarsInterestedSpot.Requests)
+	fmt.Println("CCCCCCCCCCCC",carsWantingSpot)
 	if carsWantingSpot > 0 {
 		min := 0
 		max := carsWantingSpot - 1
@@ -444,6 +461,7 @@ func (peerster *Peerster) spotAssigner() {
 
 		//The winner is
 		winnerSpot := peerster.CarsInterestedSpot.Requests[coinFlip]
+		fmt.Println("BBBBBBBB",winnerSpot)
 		//Send private message to the winner
 		spotPublicationWinner := messaging.SpotPublicationWinner{
 			Position: winnerSpot.SpotPublicationRequest.Position,
@@ -452,9 +470,10 @@ func (peerster *Peerster) spotAssigner() {
 			Origin:                peerster.Name,
 			HopLimit:              20,
 			ID:                    0,
-			Destination:           utils.Police,
+			Destination:           winnerSpot.Origin,
 			SpotPublicationWinner: &spotPublicationWinner,
 		}
+		fmt.Println("PARK", privateAlert)
 		peerster.sendNewPrivateMessage(privateAlert)
 		peerster.CarsInterestedSpot.SaveSpots = false
 		peerster.CarsInterestedSpot.Requests = nil
@@ -658,6 +677,9 @@ func (peerster *Peerster) serverReceive(buffer []byte, originAddr net.UDPAddr) {
 
 		//Function where the cars that won receive the message
 		peerster.handleIncomingSpotWinnerMessage(receivedPacket.Private)
+
+		//Function where the spotter saves the cars asking for the spot
+		peerster.handleIncomingSpotRequestMessage(receivedPacket.Private)
 
 		//Function that handles a colision negotiation message
 		peerster.handleIncomingResolutionM(receivedPacket.Colision, addr)

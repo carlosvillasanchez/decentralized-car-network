@@ -56,7 +56,6 @@ func (peerster *Peerster) MoveCarPosition() {
 						continue
 					}
 					if !peerster.AreaChangeSession.Active {
-						fmt.Println("CCCCCCCCCCCCCCCCCC")
 						peerster.sendAreaChangeMessage(peerster.PathCar[1])
 						peerster.startAreaChangeSession()
 						continue

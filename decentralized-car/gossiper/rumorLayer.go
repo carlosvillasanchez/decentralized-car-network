@@ -30,6 +30,18 @@ func (peerster *Peerster) sendAreaChangeMessage(pos utils.Position) {
 	}
 	peerster.sendNewRumorMessage(rumorMessage)
 }
+func (peerster *Peerster) SendFreeSpotMessage() {
+	message := messaging.SpotPublishMessage{
+		Position: peerster.PathCar[0],
+	}
+	rumorMessage := messaging.RumorMessage{
+		SpotPublishMessage: &message,
+		Newsgroup:         ParkingNewsGroup, //TODO get newsgroup
+
+	}
+	peerster.sendNewRumorMessage(rumorMessage)
+}
+
 
 func (peerster *Peerster) handleIncomingAreaChange(message messaging.RumorMessage) {
 	if message.AreaChangeMessage == nil || message.Origin == peerster.Name {
@@ -56,6 +68,7 @@ func (peerster *Peerster) handleIncomingFreeSpotMessage(message messaging.RumorM
 	if message.SpotPublishMessage == nil {
 		return
 	}
+	fmt.Println("DDDDDDDDDDDDDDDDD")
 	request := messaging.SpotPublicationRequest{
 		Position: message.SpotPublishMessage.Position,
 	}
@@ -68,6 +81,9 @@ func (peerster *Peerster) handleIncomingFreeSpotMessage(message messaging.RumorM
 		Destination:            message.Origin,
 		SpotPublicationRequest: &request,
 	}
+	fmt.Println("GGGGGGGGGGGGG")
+	fmt.Printf("%v \n",request)
+	fmt.Printf("%v \n",spotRequest.Destination)
 	peerster.sendNewPrivateMessage(spotRequest)
 }
 

@@ -34,7 +34,7 @@ var emptyMap = [][]string{
 	{"N", "N", "N", "N", "N", "N", "N", "N", "N"},
 }
 
-func createPeerster(gossipAddr *string, mapString *string, name *string, peers *string, antiEntropy *int, rTimer *int, startPosition *string, endPosition *string) gossiper.Peerster {
+func createPeerster(gossipAddr *string, mapString *string, name *string, peers *string, antiEntropy *int, rTimer *int, startPosition *string, endPosition *string, areaPeers *string)  gossiper.Peerster {
 
 	UIPort := "8080"
 	fmt.Println("STARTING!!")
@@ -43,6 +43,10 @@ func createPeerster(gossipAddr *string, mapString *string, name *string, peers *
 	peersList := []string{}
 	if *peers != "" {
 		peersList = strings.Split(*peers, ",")
+	}
+	areaPeersList := []string{}
+	if *areaPeers != "" {
+		areaPeersList = strings.Split(*areaPeers, ",")
 	}
 
 	// Creation of the map, if empty put the empty map
@@ -112,7 +116,7 @@ func createPeerster(gossipAddr *string, mapString *string, name *string, peers *
 			Mutex: sync.RWMutex{},
 		},
 	}
-	for _, v := range peersList {
+	for _, v := range areaPeersList {
 		peerster.SaveCarInAreaStructure("", utils.Position{}, v)
 	}
 
@@ -120,14 +124,15 @@ func createPeerster(gossipAddr *string, mapString *string, name *string, peers *
 }
 
 func init() {
-	fmt.Println("hola")
 	rand.Seed(time.Now().UTC().UnixNano())
 }
 
-func Start(gossipAddr *string, mapString *string, name *string, peers *string, antiEntropy *int, rTimer *int, startPosition *string, endPosition *string)  {
-	peerster := createPeerster(gossipAddr, mapString, name, peers, antiEntropy, rTimer, startPosition, endPosition) 
+func Start(gossipAddr *string, mapString *string, name *string, peers *string, antiEntropy *int, rTimer *int, startPosition *string, endPosition *string, areaPeers *string, parkingSearch *bool)  {
+	peerster := createPeerster(gossipAddr, mapString, name, peers, antiEntropy, rTimer, startPosition, endPosition, areaPeers) 
 	peerster.SubscribeToNewsgroup(strconv.Itoa(utils.AreaPositioner(peerster.PathCar[0])))
-
+	if *parkingSearch{
+		peerster.SubscribeToNewsgroup(gossiper.ParkingNewsGroup)
+	}
 	// go peerster.ListenFrontend()
 	peerster.AntiEntropy()
 	peerster.SendRouteMessages()

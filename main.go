@@ -300,8 +300,18 @@ func (centralServer *CentralServer) startNodes(){
 	}
 	centralServer.carsMutex.RUnlock()
 
+	var budgetParking int
+	
+	budgetParking = int(len(centralServer.Cars) / 6) + 1
+	
+
 	for _, flag_array := range(flags){
-		go centralServer.startNode(flag_array, areas)
+		parking := false
+		if budgetParking != 0 && flag_array[2] != "police" {
+			parking = true
+			budgetParking--
+		}
+		go centralServer.startNode(flag_array, areas, parking)
 		time.Sleep(time.Millisecond*200)
 	}
 }
@@ -309,7 +319,7 @@ func (centralServer *CentralServer) startNodes(){
 /***
 * Starting 1 node
 ***/
-func (centralServer *CentralServer) startNode(flags []string, areas map[string][]string){
+func (centralServer *CentralServer) startNode(flags []string, areas map[string][]string, parking bool){
 	//var neighbours *string
 	neighbours := ""
 	for _, addrs := range(areas[flags[8]]){
@@ -317,7 +327,7 @@ func (centralServer *CentralServer) startNode(flags []string, areas map[string][
 			neighbours += addrs + ","
 		}
 	}
-	fmt.Println("NODE", flags[2], "POS", flags[6], "AREA", flags[8], "NEIGHBOURS", neighbours)
+	fmt.Println("NODE", flags[2], "POS", flags[6], "AREA", flags[8], "NEIGHBOURS", neighbours, "PARKING", parking)
 	/*var gossipAddr *string
 	*gossipAddr = flags[0]
 	var mapString *string
@@ -337,7 +347,7 @@ func (centralServer *CentralServer) startNode(flags []string, areas map[string][
 	go carDecentralized.Start(gossipAddr, mapString, name, peers, antiEntropy, rTimer, startPosition, endPosition) */
 	antiEntropy, _ := strconv.Atoi(flags[4])
 	rTimer, _ := strconv.Atoi(flags[5])
-	go carDecentralized.Start(&flags[0], &flags[1], &flags[2], &flags[3], &antiEntropy, &rTimer, &flags[6], &flags[7])
+	go carDecentralized.Start(&flags[0], &flags[1], &flags[2], &flags[3], &antiEntropy, &rTimer, &flags[6], &flags[7], &neighbours, &parking)
 
 }
 
@@ -365,27 +375,14 @@ func (centralServer *CentralServer) readNodes(){
 				c.X = int(packet.Position.X)
 				c.Y = int(packet.Position.Y)
 				centralServer.Cars[addrString] = c
-				if c.Id == "police" {
-					if c.X != 0 || c.Y != 0 {
-						if centralServer.Police {
-							fmt.Println("Police out of the station!")
-						}
-						centralServer.Police = false
-					}else{
-						if centralServer.Police {
-							fmt.Println("Police available again!")
-						}
-						centralServer.Police = true			
-					}
-				}
 				centralServer.carsMutex.Unlock()
 				centralServer.mapMutex.RLock()
 				if centralServer.Map[c.X][c.Y] == "p" {
 					centralServer.sendNode(Parking, addrString)
 				} else if centralServer.Map[c.X][c.Y] == "cc" {
-					if centralServer.Police {
-						centralServer.sendNode(Police, addrString)
-					}
+					
+					centralServer.sendNode(Police, addrString)
+					
 				}
 				centralServer.mapMutex.RUnlock()
 			}

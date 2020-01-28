@@ -55,11 +55,26 @@ func (peerster *Peerster) SendPosToServer() {
 }
 
 func (peerster *Peerster) SendNegotiationMessage() {
-	colisionMessage := messaging.ColisionResolution{
-		Origin:     peerster.Name,
-		CoinResult: peerster.ColisionInfo.CoinFlip,
-		Position:   peerster.PathCar[1],
+	var colisionMessage messaging.ColisionResolution
+	if len(peerster.PathCar) != 1 {
+		colisionMessage = messaging.ColisionResolution{
+			Origin:     peerster.Name,
+			CoinResult: peerster.ColisionInfo.CoinFlip,
+			Position:   peerster.PathCar[1],
+		}
+		// If we are stopped we will send our current position
+	}else{
+		positionAux := utils.Position{
+			X: -1,
+			Y: -1,
+		}
+		colisionMessage = messaging.ColisionResolution{
+			Origin:     peerster.Name,
+			CoinResult: peerster.ColisionInfo.CoinFlip,
+			Position:   positionAux,
+		}
 	}
+
 	packet := messaging.GossipPacket{
 		Colision: &colisionMessage,
 	}
