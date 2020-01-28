@@ -374,6 +374,10 @@ func (centralServer *CentralServer) readNodes() {
 				centralServer.carsMutex.Lock()
 				c.X = int(packet.Position.X)
 				c.Y = int(packet.Position.Y)
+				c.Messages = append(c.Messages, MessageTrace{
+					Type: "other",
+					Text: fmt.Sprintf("Position changed to %v, %v", c.X, c.Y),
+				})
 				centralServer.Cars[addrString] = c
 				centralServer.carsMutex.Unlock()
 				centralServer.mapMutex.RLock()
@@ -392,6 +396,7 @@ func (centralServer *CentralServer) readNodes() {
 			c, ok := centralServer.Cars[addrString]
 			if ok {
 				c.Messages = append(c.Messages, *packet.Trace)
+				centralServer.Cars[addrString] = c
 			}
 			centralServer.carsMutex.Unlock()
 		}

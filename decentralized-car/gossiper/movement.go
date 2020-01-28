@@ -57,7 +57,12 @@ func (peerster *Peerster) MoveCarPosition() {
 					}
 					if !peerster.AreaChangeSession.Active {
 						peerster.sendAreaChangeMessage(peerster.PathCar[1])
+						peerster.SendTrace(utils.MessageTrace{
+							Type: utils.Other,
+							Text: fmt.Sprintf("Starting area change, target location: %v", peerster.PathCar[1]),
+						})
 						peerster.startAreaChangeSession()
+
 						continue
 					}
 					peerster.collisionChecker()
@@ -159,6 +164,10 @@ func (peerster *Peerster) negotationOfColision() {
 	// and another guy from your current area wants to negotiate with you, you always win and stay still
 	coinFlip := peerster.NegotiationCoinflip()
 	peerster.ColisionInfo.CoinFlip = coinFlip
+	peerster.SendTrace(utils.MessageTrace{
+		Type: utils.Crash,
+		Text: fmt.Sprintf("Detected conflict. Sending negotiation message with coinflip %v", coinFlip),
+	})
 	peerster.SendNegotiationMessage()
 
 }

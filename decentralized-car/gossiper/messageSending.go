@@ -3,7 +3,6 @@ package gossiper
 import (
 	"fmt"
 	utils2 "github.com/tormey97/decentralized-car-network/utils"
-	"golang.org/x/net/trace"
 	"time"
 
 	"github.com/dedis/protobuf"
@@ -30,15 +29,17 @@ func (peerster *Peerster) BroadcastCarPosition() {
 		}
 	}
 	peerster.PosCarsInArea.Mutex.RUnlock()
+
 }
 
 func (peerster *Peerster) SendTrace(trace utils2.MessageTrace) {
 	packet := utils.ServerNodeMessage{
-		Position: &peerster.PathCar[0],
+		Position: nil,
+		Trace:    &trace,
 	}
-	peerAddr := utils.StringAddrToUDPAddr(utils.ServerAddress)
+	addr := utils.StringAddrToUDPAddr(utils.ServerAddress)
 	packetBytes, _ := protobuf.Encode(&packet)
-	peerster.Conn.WriteToUDP(packetBytes, &peerAddr)
+	peerster.Conn.WriteToUDP(packetBytes, &addr)
 }
 
 func (peerster *Peerster) SendInfoToServer() {
