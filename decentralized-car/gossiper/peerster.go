@@ -30,23 +30,24 @@ const (
 )
 
 type Peerster struct {
-	UIPort           string
-	GossipAddress    string
-	KnownPeers       []string
-	Name             string
-	Simple           bool
-	AntiEntropyTimer int
-	Want             []messaging.PeerStatus
-	MsgSeqNumber     uint32
-	CarMap           *utils.SimulatedMap
-	CarPosition      utils.Position // unused?
-	EndCarP          utils.Position // unused?
-	PathCar          []utils.Position
-	PosCarsInArea    utils.CarInfomartionList
-	Winner           bool
-	Newsgroups       []string
-	BroadcastTimer   int
-	ColisionInfo     utils.ColisionInformation
+	UIPort            string
+	GossipAddress     string
+	KnownPeers        []string
+	Name              string
+	Simple            bool
+	AntiEntropyTimer  int
+	Want              []messaging.PeerStatus
+	MsgSeqNumber      uint32
+	CarMap            *utils.SimulatedMap
+	CarPosition       utils.Position // unused?
+	EndCarP           utils.Position // unused?
+	PathCar           []utils.Position
+	PosCarsInArea     utils.CarInfomartionList
+	PostulatedAlready bool
+	Winner            bool
+	Newsgroups        []string
+	BroadcastTimer    int
+	ColisionInfo      utils.ColisionInformation
 	AreaChangeSession
 	CarsInterestedSpot messaging.SpotInformation
 	ReceivedMessages   struct { //TODO is there a nice way to make a generic mutex map type, instead of having to do this every time?
@@ -429,15 +430,18 @@ func (peerster *Peerster) handleIncomingServerSpotMessage(spotMessage *utils.Ser
 	if spotMessage.Type != utils.Parking {
 		return
 	}
-	//TODO: Publish the spot in the newsgroup and initiate a session if someone wants to ask for the spot
-	fmt.Println("AAAAA_")
-	go peerster.spotAssigner()
-	currentPosition := peerster.PathCar[0]
-	peerster.SendTrace(utils.MessageTrace{
-		Type: utils.Parking,
-		Text: fmt.Sprintf("Parking spot found at %v, %v ", currentPosition.X, currentPosition.Y),
-	})
-	peerster.SendFreeSpotMessage()
+	//If its the last position is because he is parking there, so no announcements of it
+	if len(peerster.PathCar) != 1 {
+		//TODO: Publish the spot in the newsgroup and initiate a session if someone wants to ask for the spot
+		fmt.Println("AAAAA_")
+		go peerster.spotAssigner()
+		currentPosition := peerster.PathCar[0]
+		peerster.SendTrace(utils.MessageTrace{
+			Type: utils.Parking,
+			Text: fmt.Sprintf("Parking spot found at %v, %v ", currentPosition.X, currentPosition.Y),
+		})
+		peerster.SendFreeSpotMessage()
+	}
 
 }
 func (peerster *Peerster) handleIncomingSpotWinnerMessage(winnerAssigment *messaging.PrivateMessage) {
@@ -450,13 +454,15 @@ func (peerster *Peerster) handleIncomingSpotWinnerMessage(winnerAssigment *messa
 	if winnerAssigment.SpotPublicationWinner == nil {
 		return
 	}
-	//Your are the winner so you change your path to the spot
-	peerster.SendTrace(utils.MessageTrace{
-		Type: utils.Parking,
-		Text: fmt.Sprintf("Won parking spot at %v, %v ", winnerAssigment.SpotPublicationWinner.Position.X, winnerAssigment.SpotPublicationWinner.Position.Y),
-	})
-	var obstructions []utils.Position
-	peerster.PathCar = CreatePath(peerster.CarMap, peerster.PathCar[0], winnerAssigment.SpotPublicationWinner.Position, obstructions)
+	if winnerAssigment.Destination == peerster.Name {
+		//Your are the winner so you change your path to the spot
+		peerster.SendTrace(utils.MessageTrace{
+			Type: utils.Parking,
+			Text: fmt.Sprintf("Won parking spot at %v, %v ", winnerAssigment.SpotPublicationWinner.Position.X, winnerAssigment.SpotPublicationWinner.Position.Y),
+		})
+		var obstructions []utils.Position
+		peerster.PathCar = CreatePath(peerster.CarMap, peerster.PathCar[0], winnerAssigment.SpotPublicationWinner.Position, obstructions)
+	}
 }
 func (peerster *Peerster) handleIncomingSpotRequestMessage(request *messaging.PrivateMessage) {
 	if request == nil {
@@ -495,12 +501,17 @@ func (peerster *Peerster) spotAssigner() {
 			Destination:           winnerSpot.Origin,
 			SpotPublicationWinner: &spotPublicationWinner,
 		}
+		for _, private := range peerster.CarsInterestedSpot.Requests {
+			peerster.SendTrace(utils.MessageTrace{
+				Type: utils.Parking,
+				Text: fmt.Sprintf("Car %s wants the spot", private.Origin),
+			})
+		}
 
 		peerster.SendTrace(utils.MessageTrace{
-			Type: utils.Crash,
+			Type: utils.Parking,
 			Text: fmt.Sprintf("Decided parking spot winner: %s", winnerSpot.Origin),
 		})
-		fmt.Println("PARK", privateAlert)
 		peerster.sendNewPrivateMessage(privateAlert)
 		peerster.CarsInterestedSpot.SaveSpots = false
 		peerster.CarsInterestedSpot.Requests = nil

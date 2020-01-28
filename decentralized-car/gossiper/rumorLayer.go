@@ -67,6 +67,10 @@ func (peerster *Peerster) handleIncomingFreeSpotMessage(message messaging.RumorM
 	if message.SpotPublishMessage == nil {
 		return
 	}
+	//To avoid requesting the spot two times
+	if peerster.PostulatedAlready == true {
+		return
+	}
 	fmt.Println("DDDDDDDDDDDDDDDDD")
 	request := messaging.SpotPublicationRequest{
 		Position: message.SpotPublishMessage.Position,
@@ -84,6 +88,7 @@ func (peerster *Peerster) handleIncomingFreeSpotMessage(message messaging.RumorM
 	fmt.Printf("%v \n", request)
 	fmt.Printf("%v \n", spotRequest.Destination)
 	peerster.sendNewPrivateMessage(spotRequest)
+	peerster.PostulatedAlready = true
 }
 
 func (peerster *Peerster) handleIncomingAccident(message messaging.RumorMessage) {
