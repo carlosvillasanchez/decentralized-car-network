@@ -5,8 +5,8 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/carlosvillasanchez/decentralized-car-network/decentralized-car/messaging"
-	"github.com/carlosvillasanchez/decentralized-car-network/utils"
+	"github.com/tormey97/decentralized-car-network/decentralized-car/messaging"
+	"github.com/tormey97/decentralized-car-network/utils"
 )
 
 type AreaChangeSession struct {
@@ -36,12 +36,11 @@ func (peerster *Peerster) SendFreeSpotMessage() {
 	}
 	rumorMessage := messaging.RumorMessage{
 		SpotPublishMessage: &message,
-		Newsgroup:         ParkingNewsGroup, //TODO get newsgroup
+		Newsgroup:          ParkingNewsGroup, //TODO get newsgroup
 
 	}
 	peerster.sendNewRumorMessage(rumorMessage)
 }
-
 
 func (peerster *Peerster) handleIncomingAreaChange(message messaging.RumorMessage) {
 	if message.AreaChangeMessage == nil || message.Origin == peerster.Name {
@@ -82,8 +81,8 @@ func (peerster *Peerster) handleIncomingFreeSpotMessage(message messaging.RumorM
 		SpotPublicationRequest: &request,
 	}
 	fmt.Println("GGGGGGGGGGGGG")
-	fmt.Printf("%v \n",request)
-	fmt.Printf("%v \n",spotRequest.Destination)
+	fmt.Printf("%v \n", request)
+	fmt.Printf("%v \n", spotRequest.Destination)
 	peerster.sendNewPrivateMessage(spotRequest)
 }
 

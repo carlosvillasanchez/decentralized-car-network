@@ -2,69 +2,69 @@ package main
 
 import (
 	"fmt"
-	//"github.com/carlosvillasanchez/decentralized-car-network/utils"
-	"github.com/carlosvillasanchez/decentralized-car-network/decentralized-car"
+	//"github.com/tormey97/decentralized-car-network/utils"
+	"github.com/tormey97/decentralized-car-network/decentralized-car"
 	"net/http"
 	"strconv"
 	"strings"
 	//"math/rand"
 	//"encoding/json"
-	"net"
-	"github.com/dedis/protobuf"
-	"sync"
-	"os/exec"
 	"bytes"
+	"github.com/dedis/protobuf"
+	"net"
+	"os/exec"
+	"sync"
 	"time"
 )
 
 const (
-    Parking = "parking" // For traces regarding parking spots
-    Crash =   "crash"   // For traces regarding the avoidance of crashes
-    Police =  "police"  // For traces regarding crash handling
-    Other =   "other"   // All rest of traces
+	Parking = "parking" // For traces regarding parking spots
+	Crash   = "crash"   // For traces regarding the avoidance of crashes
+	Police  = "police"  // For traces regarding crash handling
+	Other   = "other"   // All rest of traces
 )
 
-// STRUCTURES: 
+// STRUCTURES:
 
 type CentralServer struct {
-	Cars 			map[string]Car
-	carsMutex		sync.RWMutex
-	Buildings 		[]Building
-	ParkingSpots 	[]ParkingSpot
-	CarCrashes 		[]CarCrash
-	Map				[9][9]string
-	mapMutex		sync.RWMutex
-	conn 			*net.UDPConn
-	Police  		bool
+	Cars         map[string]Car
+	carsMutex    sync.RWMutex
+	Buildings    []Building
+	ParkingSpots []ParkingSpot
+	CarCrashes   []CarCrash
+	Map          [9][9]string
+	mapMutex     sync.RWMutex
+	conn         *net.UDPConn
+	Police       bool
 }
 
 type Car struct {
-	Id 				string
-	IP 				string
-	Port 			string
-	X 				int
-	Y 				int
-	DestinationX 	int
-	DestinationY  	int
-	Messages 		[]MessageTrace
+	Id           string
+	IP           string
+	Port         string
+	X            int
+	Y            int
+	DestinationX int
+	DestinationY int
+	Messages     []MessageTrace
 }
 
 type Building struct {
 	Id string
-	X int
-	Y int
+	X  int
+	Y  int
 }
 
 type CarCrash struct {
 	Id string
-	X int
-	Y int
+	X  int
+	Y  int
 }
 
 type ParkingSpot struct {
 	Id string
-	X int
-	Y int
+	X  int
+	Y  int
 }
 
 type ServerNodeMessage struct {
@@ -83,7 +83,7 @@ type Position struct { // TODO will probably be defined elsewhere
 type ServerMessage struct {
 	Type string
 }
-	
+
 // MAIN FUNCTION. Starting the server.
 func main() {
 	cmd := exec.Command("whoami")
@@ -97,7 +97,7 @@ func main() {
 	udpAddr, _ := net.ResolveUDPAddr("udp4", "127.0.0.1:5999")
 	udpConn, _ := net.ListenUDP("udp4", udpAddr)
 	centralServer := CentralServer{
-		conn: udpConn,
+		conn:   udpConn,
 		Police: true,
 	}
 	go centralServer.readNodes()
@@ -110,14 +110,14 @@ func main() {
 	http.HandleFunc("/update", centralServer.updateAPI)
 	http.HandleFunc("/stop", centralServer.stopAPI)
 	// Web socket
-	http.ListenAndServe(":" + strconv.Itoa(8086), nil)
+	http.ListenAndServe(":"+strconv.Itoa(8086), nil)
 }
 
 /***
 * Writing all the information for setup.
 ***/
 func (centralServer *CentralServer) setupCentralServer(cars string, buildings string, carCrashes string, parkingSpots string) {
-	if cars != ""{
+	if cars != "" {
 		carsSplited := strings.Split(cars, ",")
 		carsDict := make(map[string]Car)
 		for i := 0; i < len(carsSplited)/7; i++ {
@@ -126,22 +126,22 @@ func (centralServer *CentralServer) setupCentralServer(cars string, buildings st
 			destinationX, _ := strconv.Atoi(carsSplited[i*7+5])
 			destinationY, _ := strconv.Atoi(carsSplited[i*7+6])
 			newCar := Car{
-				Id: carsSplited[i*7],
-				IP: carsSplited[i*7+1],
-				Port: carsSplited[i*7+2],
-				X: x,
-				Y: y,
+				Id:           carsSplited[i*7],
+				IP:           carsSplited[i*7+1],
+				Port:         carsSplited[i*7+2],
+				X:            x,
+				Y:            y,
 				DestinationX: destinationX,
 				DestinationY: destinationY,
 			}
-			carsDict[newCar.IP + ":" + newCar.Port] = newCar
+			carsDict[newCar.IP+":"+newCar.Port] = newCar
 		}
 		centralServer.carsMutex.Lock()
 		centralServer.Cars = carsDict
 		fmt.Println(centralServer.Cars)
 		centralServer.carsMutex.Unlock()
 	}
-	if buildings != ""{
+	if buildings != "" {
 		buildingsSplited := strings.Split(buildings, ",")
 		var buildingsArray []Building
 		for i := 0; i < len(buildingsSplited)/3; i++ {
@@ -149,14 +149,14 @@ func (centralServer *CentralServer) setupCentralServer(cars string, buildings st
 			y, _ := strconv.Atoi(buildingsSplited[i*3+2])
 			newBuilding := Building{
 				Id: buildingsSplited[i*3],
-				X: x,
-				Y: y,
+				X:  x,
+				Y:  y,
 			}
 			buildingsArray = append(buildingsArray, newBuilding)
 		}
 		centralServer.Buildings = buildingsArray
 	}
-	if carCrashes != ""{
+	if carCrashes != "" {
 		carCrashesSplited := strings.Split(carCrashes, ",")
 		var carCrashesArray []CarCrash
 		for i := 0; i < len(carCrashesSplited)/3; i++ {
@@ -164,14 +164,14 @@ func (centralServer *CentralServer) setupCentralServer(cars string, buildings st
 			y, _ := strconv.Atoi(carCrashesSplited[i*3+2])
 			newCarCrash := CarCrash{
 				Id: carCrashesSplited[i*3],
-				X: x,
-				Y: y,
+				X:  x,
+				Y:  y,
 			}
 			carCrashesArray = append(carCrashesArray, newCarCrash)
 		}
 		centralServer.CarCrashes = carCrashesArray
 	}
-	if parkingSpots != ""{
+	if parkingSpots != "" {
 		parkingSpotsSplited := strings.Split(parkingSpots, ",")
 		var parkingSpotsArray []ParkingSpot
 		for i := 0; i < len(parkingSpotsSplited)/3; i++ {
@@ -179,8 +179,8 @@ func (centralServer *CentralServer) setupCentralServer(cars string, buildings st
 			y, _ := strconv.Atoi(parkingSpotsSplited[i*3+2])
 			newParkingSpot := ParkingSpot{
 				Id: parkingSpotsSplited[i*3],
-				X: x,
-				Y: y,
+				X:  x,
+				Y:  y,
 			}
 			parkingSpotsArray = append(parkingSpotsArray, newParkingSpot)
 		}
@@ -192,7 +192,7 @@ func (centralServer *CentralServer) setupCentralServer(cars string, buildings st
 /***
 * Disigning the map and launching the nodes
 ***/
-func (centralServer *CentralServer) startProtocol(){
+func (centralServer *CentralServer) startProtocol() {
 	centralServer.mapAddBuildings()
 	centralServer.startNodes()
 	centralServer.mapAddCarCrashes()
@@ -202,7 +202,7 @@ func (centralServer *CentralServer) startProtocol(){
 /***
 * Add buildings
 ***/
-func (centralServer *CentralServer) mapAddBuildings(){
+func (centralServer *CentralServer) mapAddBuildings() {
 	centralServer.mapMutex.Lock()
 	for _, building := range centralServer.Buildings {
 		centralServer.Map[building.X][building.Y] = "b"
@@ -214,7 +214,7 @@ func (centralServer *CentralServer) mapAddBuildings(){
 /***
 * Add car crashes
 ***/
-func (centralServer *CentralServer) mapAddCarCrashes(){
+func (centralServer *CentralServer) mapAddCarCrashes() {
 	centralServer.mapMutex.Lock()
 	for _, carCrash := range centralServer.CarCrashes {
 		centralServer.Map[carCrash.X][carCrash.Y] = "cc"
@@ -226,7 +226,7 @@ func (centralServer *CentralServer) mapAddCarCrashes(){
 /***
 * Add parking spots
 ***/
-func (centralServer *CentralServer) mapAddParkingSpots(){
+func (centralServer *CentralServer) mapAddParkingSpots() {
 	centralServer.mapMutex.Lock()
 	for _, parkingSpot := range centralServer.ParkingSpots {
 		centralServer.Map[parkingSpot.X][parkingSpot.Y] = "p"
@@ -238,14 +238,14 @@ func (centralServer *CentralServer) mapAddParkingSpots(){
 /***
 * Launching nodes
 ***/
-func (centralServer *CentralServer) startNodes(){
+func (centralServer *CentralServer) startNodes() {
 	var mapFlag string
 	centralServer.mapMutex.RLock()
-	for _, row := range(centralServer.Map){
-		for _, obj := range(row){
-			if obj == ""{
+	for _, row := range centralServer.Map {
+		for _, obj := range row {
+			if obj == "" {
 				mapFlag += "N,"
-			}else{
+			} else {
 				mapFlag += "B,"
 			}
 		}
@@ -255,11 +255,11 @@ func (centralServer *CentralServer) startNodes(){
 	var ids []string
 	areas := make(map[string][]string)
 	centralServer.carsMutex.RLock()
-	for i, car := range(centralServer.Cars){
+	for i, car := range centralServer.Cars {
 		var flags_aux []string
 
 		// gossipAddrs
-		flags_aux = append(flags_aux, car.IP + ":" + car.Port)
+		flags_aux = append(flags_aux, car.IP+":"+car.Port)
 		// map
 		flags_aux = append(flags_aux, mapFlag)
 		// name
@@ -270,9 +270,9 @@ func (centralServer *CentralServer) startNodes(){
 		} else if len(ids) == 1 {
 			peers := centralServer.Cars[ids[0]].IP + ":" + centralServer.Cars[ids[0]].Port
 			flags_aux = append(flags_aux, peers)
-		}else{
-			peers := centralServer.Cars[ids[len(ids) - 1]].IP + ":" + centralServer.Cars[ids[len(ids) - 1]].Port
-			peers += centralServer.Cars[ids[len(ids) - 2]].IP + ":" + centralServer.Cars[ids[len(ids) - 2]].Port
+		} else {
+			peers := centralServer.Cars[ids[len(ids)-1]].IP + ":" + centralServer.Cars[ids[len(ids)-1]].Port
+			peers += centralServer.Cars[ids[len(ids)-2]].IP + ":" + centralServer.Cars[ids[len(ids)-2]].Port
 			flags_aux = append(flags_aux, peers)
 		}
 		// antiEntropy
@@ -280,9 +280,9 @@ func (centralServer *CentralServer) startNodes(){
 		// rTimer
 		flags_aux = append(flags_aux, "5")
 		// startPosition
-		flags_aux = append(flags_aux, strconv.Itoa(car.X) + "," + strconv.Itoa(car.Y))
+		flags_aux = append(flags_aux, strconv.Itoa(car.X)+","+strconv.Itoa(car.Y))
 		// endPosition
-		flags_aux = append(flags_aux, strconv.Itoa(car.DestinationX) + "," + strconv.Itoa(car.DestinationY))
+		flags_aux = append(flags_aux, strconv.Itoa(car.DestinationX)+","+strconv.Itoa(car.DestinationY))
 		// area
 		var area int
 		if car.X > 4 {
@@ -293,8 +293,8 @@ func (centralServer *CentralServer) startNodes(){
 		}
 		flags_aux = append(flags_aux, strconv.Itoa(area))
 
-		areas[strconv.Itoa(area)] = append(areas[strconv.Itoa(area)], car.IP + ":" + car.Port)
-		
+		areas[strconv.Itoa(area)] = append(areas[strconv.Itoa(area)], car.IP+":"+car.Port)
+
 		ids = append(ids, i)
 
 		flags = append(flags, flags_aux)
@@ -302,28 +302,27 @@ func (centralServer *CentralServer) startNodes(){
 	centralServer.carsMutex.RUnlock()
 
 	var budgetParking int
-	
-	budgetParking = int(len(centralServer.Cars) / 6) + 1
-	
 
-	for _, flag_array := range(flags){
+	budgetParking = int(len(centralServer.Cars)/6) + 1
+
+	for _, flag_array := range flags {
 		parking := false
 		if budgetParking != 0 && flag_array[2] != "police" {
 			parking = true
 			budgetParking--
 		}
 		go centralServer.startNode(flag_array, areas, parking)
-		time.Sleep(time.Millisecond*200)
+		time.Sleep(time.Millisecond * 200)
 	}
 }
 
 /***
 * Starting 1 node
 ***/
-func (centralServer *CentralServer) startNode(flags []string, areas map[string][]string, parking bool){
+func (centralServer *CentralServer) startNode(flags []string, areas map[string][]string, parking bool) {
 	//var neighbours *string
 	neighbours := ""
-	for _, addrs := range(areas[flags[8]]){
+	for _, addrs := range areas[flags[8]] {
 		if addrs != flags[0] {
 			neighbours += addrs + ","
 		}
@@ -352,21 +351,21 @@ func (centralServer *CentralServer) startNode(flags []string, areas map[string][
 
 }
 
-/*** 
+/***
 * Socket for listening to nodes
 ***/
-func (centralServer *CentralServer) readNodes(){
+func (centralServer *CentralServer) readNodes() {
 	for {
-		
+
 		buffer := make([]byte, 9000)
 		n, addr, _ := centralServer.conn.ReadFromUDP(buffer)
 		// Dcoding the Packet
 		packet := &ServerNodeMessage{}
-		
+
 		protobuf.Decode(buffer[0:n], packet)
 		addrString := addr.String()
 		//[TODO: WHEN A CARCRASH OR PARKING SPOT DISAPPEARS.]
-		if(packet.Position != nil){
+		if packet.Position != nil {
 			centralServer.carsMutex.RLock()
 			//fmt.Println("IT IS A POSITION FROM", addrString, "NAME", centralServer.Cars[addrString].Id, ": X", packet.Position.X, "Y", packet.Position.Y)
 			c, ok := centralServer.Cars[addrString]
@@ -381,13 +380,13 @@ func (centralServer *CentralServer) readNodes(){
 				if centralServer.Map[c.X][c.Y] == "p" {
 					centralServer.sendNode(Parking, addrString)
 				} else if centralServer.Map[c.X][c.Y] == "cc" {
-					
+
 					centralServer.sendNode(Police, addrString)
-					
+
 				}
 				centralServer.mapMutex.RUnlock()
 			}
-		}else if(packet.Trace != nil){
+		} else if packet.Trace != nil {
 			centralServer.carsMutex.Lock()
 			fmt.Println("IT IS A TRACE FROM", addrString, "NAME", centralServer.Cars[addrString].Id, "TYPE", packet.Trace.Type, "TEXT", packet.Trace.Text)
 			c, ok := centralServer.Cars[addrString]
@@ -397,13 +396,13 @@ func (centralServer *CentralServer) readNodes(){
 			centralServer.carsMutex.Unlock()
 		}
 	}
-	
+
 }
 
 /***
 * Sending an event to a nodes
 ***/
-func (centralServer *CentralServer) sendNode(text string, addr string){
+func (centralServer *CentralServer) sendNode(text string, addr string) {
 	fmt.Println("Informing of a", text, "to", addr)
 	// Sending the packet
 	addrs_receive, _ := net.ResolveUDPAddr("udp", addr)
@@ -415,7 +414,7 @@ func (centralServer *CentralServer) sendNode(text string, addr string){
 /***
 * Printing map
 ***/
-func (centralServer *CentralServer) printMap(){
+func (centralServer *CentralServer) printMap() {
 	centralServer.mapMutex.RLock()
 	fmt.Println("MAP", centralServer.Map)
 	centralServer.mapMutex.RUnlock()

@@ -10,9 +10,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/carlosvillasanchez/decentralized-car-network/decentralized-car/gossiper"
-	"github.com/carlosvillasanchez/decentralized-car-network/decentralized-car/messaging"
-	"github.com/carlosvillasanchez/decentralized-car-network/utils"
+	"github.com/tormey97/decentralized-car-network/decentralized-car/gossiper"
+	"github.com/tormey97/decentralized-car-network/decentralized-car/messaging"
+	"github.com/tormey97/decentralized-car-network/utils"
 )
 
 type Origin int
@@ -34,12 +34,12 @@ var emptyMap = [][]string{
 	{"N", "N", "N", "N", "N", "N", "N", "N", "N"},
 }
 
-func createPeerster(gossipAddr *string, mapString *string, name *string, peers *string, antiEntropy *int, rTimer *int, startPosition *string, endPosition *string, areaPeers *string)  gossiper.Peerster {
+func createPeerster(gossipAddr *string, mapString *string, name *string, peers *string, antiEntropy *int, rTimer *int, startPosition *string, endPosition *string, areaPeers *string) gossiper.Peerster {
 
 	UIPort := "8080"
 	fmt.Println("STARTING!!")
 	simple := false
-	
+
 	peersList := []string{}
 	if *peers != "" {
 		peersList = strings.Split(*peers, ",")
@@ -127,10 +127,10 @@ func init() {
 	rand.Seed(time.Now().UTC().UnixNano())
 }
 
-func Start(gossipAddr *string, mapString *string, name *string, peers *string, antiEntropy *int, rTimer *int, startPosition *string, endPosition *string, areaPeers *string, parkingSearch *bool)  {
-	peerster := createPeerster(gossipAddr, mapString, name, peers, antiEntropy, rTimer, startPosition, endPosition, areaPeers) 
+func Start(gossipAddr *string, mapString *string, name *string, peers *string, antiEntropy *int, rTimer *int, startPosition *string, endPosition *string, areaPeers *string, parkingSearch *bool) {
+	peerster := createPeerster(gossipAddr, mapString, name, peers, antiEntropy, rTimer, startPosition, endPosition, areaPeers)
 	peerster.SubscribeToNewsgroup(strconv.Itoa(utils.AreaPositioner(peerster.PathCar[0])))
-	if *parkingSearch{
+	if *parkingSearch {
 		peerster.SubscribeToNewsgroup(gossiper.ParkingNewsGroup)
 	}
 	// go peerster.ListenFrontend()
@@ -138,7 +138,7 @@ func Start(gossipAddr *string, mapString *string, name *string, peers *string, a
 	peerster.SendRouteMessages()
 
 	//Broadcast the car position in the current area of the car
-	go func(){
+	go func() {
 		for {
 			time.Sleep(time.Duration(peerster.BroadcastTimer) * time.Second)
 			peerster.BroadcastCarPosition()
