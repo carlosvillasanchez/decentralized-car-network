@@ -102,6 +102,7 @@ func main() {
 	}
 	go centralServer.readNodes()
 	// ENDPOINTS
+	http.Handle("/", http.FileServer(http.Dir("./build")))
 	http.HandleFunc("/setup", centralServer.setupAPI)
 	http.HandleFunc("/addCarCrash", centralServer.addCarCrashAPI)
 	http.HandleFunc("/addParkingSpot", centralServer.addParkingSpotAPI)
