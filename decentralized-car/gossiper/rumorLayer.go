@@ -18,33 +18,17 @@ type AreaChangeSession struct {
 }
 
 func (peerster *Peerster) SendAreaChangeMessage(pos utils.Position) {
-	peerster.SendTrace(utils.MessageTrace{
-		Type: utils.Crash,
-		Text: fmt.Sprintf("This is a trace 12312312312: %v", peerster.Name),
-	})
 	message := messaging.AreaChangeMessage{
 		NextPosition:    pos,
 		CurrentPosition: peerster.PathCar[0],
 		IpofCarChanging: peerster.GossipAddress,
 	}
-	peerster.SendTrace(utils.MessageTrace{
-		Type: utils.Crash,
-		Text: fmt.Sprintf("This is a trace jiadojasd: %v", peerster.Name),
-	})
 	rumorMessage := messaging.RumorMessage{
 		Newsgroup:         strconv.Itoa(utils.AreaPositioner(pos)), //TODO get newsgroup
 		AreaChangeMessage: &message,
 		AccidentMessage:   nil,
 	}
-	peerster.SendTrace(utils.MessageTrace{
-		Type: utils.Crash,
-		Text: fmt.Sprintf("This is a trace 125121sadsaxzxz6: %v", peerster.Name),
-	})
 	peerster.sendNewRumorMessage(rumorMessage)
-	peerster.SendTrace(utils.MessageTrace{
-		Type: utils.Crash,
-		Text: fmt.Sprintf("This is a trace 5edsfddsdldld6: %v", peerster.Name),
-	})
 }
 func (peerster *Peerster) SendFreeSpotMessage() {
 	message := messaging.SpotPublishMessage{

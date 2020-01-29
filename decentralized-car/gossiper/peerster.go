@@ -122,7 +122,7 @@ func (peerster *Peerster) startRumormongeringSession(peer string, message messag
 	if !ok || session.Active == false {
 		session = messaging.RumormongeringSession{
 			Message: message,
-			Channel: make(chan bool),
+			Channel: make(chan bool, 1),
 			Active:  false,
 			Mutex:   sync.RWMutex{},
 		}
@@ -180,59 +180,22 @@ func (peerster *Peerster) handleIncomingRumor(rumor *messaging.RumorMessage, ori
 	//if rumor.Text != "" {
 	//fmt.Printf("RUMOR origin %s from %s ID %v contents %s \n", rumor.Origin, originAddr.String(), rumor.ID, rumor.Text)
 	//}
-	peerster.SendTrace(utils.MessageTrace{
-		Type: utils.Crash,
-		Text: fmt.Sprintf("F1: %v", peerster.Name),
-	})
 	peerster.addToWantStruct(rumor.Origin, rumor.ID)
-	peerster.SendTrace(utils.MessageTrace{
-		Type: utils.Crash,
-		Text: fmt.Sprintf("F2: %v", peerster.Name),
-	})
 	peerster.addToReceivedMessages(*rumor)
-	peerster.SendTrace(utils.MessageTrace{
-		Type: utils.Crash,
-		Text: fmt.Sprintf("F3: %v", peerster.Name),
-	})
 	if rumor.Text != "" {
 		fmt.Printf("DSDV %s %s \n", rumor.Origin, originAddr.String())
 	}
 	isNew := peerster.updateWantStruct(rumor.Origin, rumor.ID)
-	peerster.SendTrace(utils.MessageTrace{
-		Type: utils.Crash,
-		Text: fmt.Sprintf("F4: %v", peerster.Name),
-	})
 	if isNew {
 		// We add the originaddress to the next hop table if it's a new message
 		peerster.addToNextHopTable(*rumor, originAddr.String())
 	}
-	peerster.SendTrace(utils.MessageTrace{
-		Type: utils.Crash,
-		Text: fmt.Sprintf("F5: %v", peerster.Name),
-	})
 	// If the message is in an appropriate newsgroup, we should handle the various subtypes of rumormessage
 	if peerster.FilterMessageByNewsgroup(*rumor) {
-		peerster.SendTrace(utils.MessageTrace{
-			Type: utils.Crash,
-			Text: fmt.Sprintf("F6: %v", peerster.Name),
-		})
 		peerster.handleIncomingAccident(*rumor)
-		peerster.SendTrace(utils.MessageTrace{
-			Type: utils.Crash,
-			Text: fmt.Sprintf("F7: %v", peerster.Name),
-		})
 		peerster.handleIncomingAreaChange(*rumor)
-		peerster.SendTrace(utils.MessageTrace{
-			Type: utils.Crash,
-			Text: fmt.Sprintf("F8: %v", peerster.Name),
-		})
-
 		//Function where you recieve a spot publication and can request it
 		peerster.handleIncomingFreeSpotMessage(*rumor)
-		peerster.SendTrace(utils.MessageTrace{
-			Type: utils.Crash,
-			Text: fmt.Sprintf("F9: %v", peerster.Name),
-		})
 	}
 	isFromMyself := originAddr.String() == peerster.GossipAddress
 	peer := ""
