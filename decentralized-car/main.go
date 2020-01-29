@@ -13,6 +13,8 @@ import (
 	"github.com/tormey97/decentralized-car-network/decentralized-car/gossiper"
 	"github.com/tormey97/decentralized-car-network/decentralized-car/messaging"
 	"github.com/tormey97/decentralized-car-network/utils"
+	"crypto/rsa"
+	//rand2 "crypto/rand"
 )
 
 type Origin int
@@ -34,7 +36,7 @@ var emptyMap = [][]string{
 	{"N", "N", "N", "N", "N", "N", "N", "N", "N"},
 }
 
-func createPeerster(gossipAddr *string, mapString *string, name *string, peers *string, antiEntropy *int, rTimer *int, startPosition *string, endPosition *string, areaPeers *string) gossiper.Peerster {
+func createPeerster(gossipAddr *string, mapString *string, name *string, peers *string, antiEntropy *int, rTimer *int, startPosition *string, endPosition *string, areaPeers *string, sk rsa.PrivateKey, pk rsa.PublicKey, policePk rsa.PublicKey) gossiper.Peerster {
 
 	UIPort := "8080"
 	fmt.Println("STARTING!!")
@@ -49,7 +51,7 @@ func createPeerster(gossipAddr *string, mapString *string, name *string, peers *
 		areaPeersList = strings.Split(*areaPeers, ",")
 
 	}
-	fmt.Println("prueba", areaPeersList)
+	
 	// Creation of the map, if empty put the empty map
 	var carMap [10][10]utils.Square
 	if *mapString == "" {
@@ -80,6 +82,9 @@ func createPeerster(gossipAddr *string, mapString *string, name *string, peers *
 		CarMap:           &finalCarMap,
 		PathCar:          carPath,
 		BroadcastTimer:   gossiper.BroadcastTimer,
+		Sk:				  sk,
+		Pk:				  pk,
+		PolicePk:		  policePk,
 		PosCarsInArea: utils.CarInfomartionList{
 			Slice: make([]*utils.CarInformation, 0),
 			Mutex: sync.RWMutex{},
@@ -128,8 +133,8 @@ func init() {
 	rand.Seed(time.Now().UTC().UnixNano())
 }
 
-func Start(gossipAddr *string, mapString *string, name *string, peers *string, antiEntropy *int, rTimer *int, startPosition *string, endPosition *string, areaPeers *string, parkingSearch *bool) {
-	peerster := createPeerster(gossipAddr, mapString, name, peers, antiEntropy, rTimer, startPosition, endPosition, areaPeers)
+func Start(gossipAddr *string, mapString *string, name *string, peers *string, antiEntropy *int, rTimer *int, startPosition *string, endPosition *string, areaPeers *string, parkingSearch *bool, sk rsa.PrivateKey, pk rsa.PublicKey, policePk rsa.PublicKey) {
+	peerster := createPeerster(gossipAddr, mapString, name, peers, antiEntropy, rTimer, startPosition, endPosition, areaPeers, sk, pk, policePk)
 	fmt.Println(*name)
 	for _, value := range peerster.PosCarsInArea.Slice {
 		fmt.Printf("%+v\n", value)

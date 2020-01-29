@@ -18,7 +18,8 @@ type PrivateMessage struct {
 	Text                   string
 	Destination            string
 	HopLimit               uint32
-	AlertPoliceCar         *AlertPolice
+	//AlertPoliceCar         *AlertPolice
+	AlertPoliceCar		   *[]byte
 	SpotPublicationRequest *SpotPublicationRequest
 	SpotPublicationWinner  *SpotPublicationWinner
 }

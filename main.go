@@ -18,6 +18,9 @@ import (
 	"time"
 
 	"github.com/dedis/protobuf"
+	"flag"
+	"crypto/rsa"
+	"crypto/rand"
 )
 
 const (
@@ -39,6 +42,7 @@ type CentralServer struct {
 	mapMutex     sync.RWMutex
 	conn         *net.UDPConn
 	Police       bool
+	WT			 bool
 }
 
 type Car struct {
@@ -89,6 +93,8 @@ type ServerMessage struct {
 
 // MAIN FUNCTION. Starting the server.
 func main() {
+	var webOfTrust bool
+	flag.BoolVar(&webOfTrust, "wt", false, "add a web of trust")
 	cmd := exec.Command("whoami")
 	var out bytes.Buffer
 	cmd.Stdout = &out
@@ -102,6 +108,7 @@ func main() {
 	centralServer := CentralServer{
 		conn:   udpConn,
 		Police: true,
+		WT: webOfTrust,
 	}
 	go centralServer.readNodes()
 	// ENDPOINTS
@@ -256,6 +263,8 @@ func (centralServer *CentralServer) startNodes() {
 	centralServer.mapMutex.RUnlock()
 	var flags [][]string
 	var ids []string
+	sks := make(map[string]rsa.PrivateKey)
+	pks := make(map[string]rsa.PublicKey)
 	areas := make(map[string][]string)
 	centralServer.carsMutex.RLock()
 	for i, car := range centralServer.Cars {
@@ -295,8 +304,12 @@ func (centralServer *CentralServer) startNodes() {
 			area += 2
 		}
 		flags_aux = append(flags_aux, strconv.Itoa(area))
-
 		areas[strconv.Itoa(area)] = append(areas[strconv.Itoa(area)], car.IP+":"+car.Port)
+		// Sk, Pk
+		sk, _ := rsa.GenerateKey(rand.Reader, 2048)
+		pk := sk.PublicKey
+		sks[car.Id] = *sk
+		pks[car.Id] = pk
 
 		ids = append(ids, i)
 
@@ -314,7 +327,7 @@ func (centralServer *CentralServer) startNodes() {
 			parking = true
 			budgetParking--
 		}
-		go centralServer.startNode(flag_array, areas, parking)
+		go centralServer.startNode(flag_array, areas, parking, sks, pks)
 		time.Sleep(time.Millisecond * 200)
 	}
 }
@@ -322,7 +335,7 @@ func (centralServer *CentralServer) startNodes() {
 /***
 * Starting 1 node
 ***/
-func (centralServer *CentralServer) startNode(flags []string, areas map[string][]string, parking bool) {
+func (centralServer *CentralServer) startNode(flags []string, areas map[string][]string, parking bool, sks map[string]rsa.PrivateKey, pks map[string]rsa.PublicKey) {
 	//var neighbours *string
 	neighbours := ""
 	for _, addrs := range areas[flags[8]] {
@@ -337,7 +350,10 @@ func (centralServer *CentralServer) startNode(flags []string, areas map[string][
 
 	antiEntropy, _ := strconv.Atoi(flags[4])
 	rTimer, _ := strconv.Atoi(flags[5])
-	carDecentralized.Start(&flags[0], &flags[1], &flags[2], &flags[3], &antiEntropy, &rTimer, &flags[6], &flags[7], &neighbours, &parking)
+	sk := sks[flags[2]]
+	pk := pks[flags[2]]
+	policePk := pks["police"]
+	carDecentralized.Start(&flags[0], &flags[1], &flags[2], &flags[3], &antiEntropy, &rTimer, &flags[6], &flags[7], &neighbours, &parking, sk, pk, policePk)
 
 }
 

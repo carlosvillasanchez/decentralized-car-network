@@ -13,6 +13,8 @@ import (
 	"github.com/dedis/protobuf"
 	"github.com/tormey97/decentralized-car-network/decentralized-car/messaging"
 	"github.com/tormey97/decentralized-car-network/utils"
+	"crypto/rsa"
+	randCrytpo "crypto/rand"
 )
 
 type Origin int
@@ -47,6 +49,9 @@ type Peerster struct {
 	Winner            bool
 	Newsgroups        []string
 	BroadcastTimer    int
+	Sk				  rsa.PrivateKey
+	Pk				  rsa.PublicKey
+	PolicePk		  rsa.PublicKey
 	ColisionInfo      utils.ColisionInformation
 	AreaChangeSession
 	CarsInterestedSpot messaging.SpotInformation
@@ -363,9 +368,18 @@ func (peerster *Peerster) handleIncomingAccidentMessage(alertToPolice *messaging
 	if alertToPolice.AlertPoliceCar == nil {
 		return
 	}
+	plainText, _ := rsa.DecryptPKCS1v15(randCrytpo.Reader, &peerster.Sk, *alertToPolice.AlertPoliceCar)
+	fmt.Printf("RECEIVING To POLICE %x\n", plainText)
+	// Dcoding the GossipPacket
+	alertObject := &messaging.AlertPolice{}
+	err := protobuf.Decode(plainText, alertObject)
+	if err != nil {
+		fmt.Println("COULD NOT DCODE!", err)
+		return
+	}
 	// There has been an accident, so download file and go there
 	file := FileBeingDownloaded{
-		MetafileHash:   alertToPolice.AlertPoliceCar.Evidence,
+		MetafileHash:   alertObject.Evidence,
 		Channel:        make(chan messaging.DataReply),
 		CurrentChunk:   0,
 		Metafile:       nil,
@@ -375,7 +389,7 @@ func (peerster *Peerster) handleIncomingAccidentMessage(alertToPolice *messaging
 	peerster.downloadData([]string{alertToPolice.Origin}, file)
 	peerster.SendTrace(utils.MessageTrace{
 		Type: utils.Crash,
-		Text: fmt.Sprintf("Received a report of an accident from %s at position %v", alertToPolice.AlertPoliceCar.Origin, alertToPolice.AlertPoliceCar.Position),
+		Text: fmt.Sprintf("Received a report of an accident from %s at position %v", alertObject.Origin, alertObject.Position),
 	})
 	//Change path
 	// He spawns at the middle
@@ -384,7 +398,7 @@ func (peerster *Peerster) handleIncomingAccidentMessage(alertToPolice *messaging
 		Y: 4,
 	}*/
 	var obstructions []utils.Position
-	peerster.PathCar = CreatePath(peerster.CarMap, peerster.PathCar[0], alertToPolice.AlertPoliceCar.Position, obstructions)
+	peerster.PathCar = CreatePath(peerster.CarMap, peerster.PathCar[0], alertObject.Position, obstructions)
 	// Now the police car should start moving
 }
 
@@ -408,8 +422,11 @@ func (peerster *Peerster) handleIncomingServerAccidentMessage(alertMessage *util
 	// File indexing
 	alert.Evidence = peerster.shareFile(IMAGEACCIDENT)
 	alert.Origin = peerster.Name
+	objectBytes, _ := protobuf.Encode(&alert)
+	ciphertext, _ := rsa.EncryptPKCS1v15(randCrytpo.Reader, &peerster.PolicePk, objectBytes)
+	fmt.Printf("SENDING To POLICE %x\n", objectBytes)
 	privateAlert := messaging.PrivateMessage{
-		AlertPoliceCar: &alert,
+		AlertPoliceCar: &ciphertext,
 		Destination:    "police",
 	}
 
