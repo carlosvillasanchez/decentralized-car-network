@@ -20,12 +20,12 @@ type Origin int
 const (
 	Client           Origin        = iota
 	Server           Origin        = iota
-	TIMEOUTCARS      time.Duration = 30
-	TIMEOUTSPOTS     time.Duration = 5
+	TIMEOUTCARS      time.Duration = 10
+	TIMEOUTSPOTS     time.Duration = 10
 	IMAGEACCIDENT    string        = "accident.jpg"
 	BroadcastTimer   int           = 1 //Each 1 second the car broadcast position
-	MovementTimer    int           = 3
-	AreaChangeTimer  time.Duration = 6
+	MovementTimer    int           = 2
+	AreaChangeTimer  time.Duration = 4
 	ParkingNewsGroup string        = "parking"
 )
 
@@ -235,23 +235,23 @@ func (peerster *Peerster) handleIncomingArea(areaMessage *messaging.AreaMessage,
 	//If the other car is in your area, or the next point where you want to go (another area you want to enter)
 	if len(peerster.PathCar) > 1 {
 		if (utils.AreaPositioner(areaMessage.Position) == utils.AreaPositioner(peerster.PathCar[0])) || (areaMessage.Position == peerster.PathCar[1]) {
+			//This saves people in our area
+			peerster.areaMessageManagement(areaMessage, IPofCar)
 
-			carExists := false
+		} else {
 			peerster.PosCarsInArea.Mutex.Lock()
 			for _, carInfo := range peerster.PosCarsInArea.Slice {
 				if carInfo.IPCar == IPofCar {
 					carInfo.Origin = areaMessage.Origin
 					carInfo.Position = areaMessage.Position
-					carInfo.Channel <- false
-					carExists = true
 				}
 			}
 			peerster.PosCarsInArea.Mutex.Unlock()
-			if carExists == false {
-				origin := areaMessage.Origin
-				position := areaMessage.Position
-				peerster.SaveCarInAreaStructure(origin, position, IPofCar)
-			}
+		}
+		// This would trigger if is the car is stopped
+	} else {
+		if utils.AreaPositioner(areaMessage.Position) == utils.AreaPositioner(peerster.PathCar[0]) {
+			peerster.areaMessageManagement(areaMessage, IPofCar)
 		} else {
 			peerster.PosCarsInArea.Mutex.Lock()
 			for _, carInfo := range peerster.PosCarsInArea.Slice {
@@ -264,6 +264,30 @@ func (peerster *Peerster) handleIncomingArea(areaMessage *messaging.AreaMessage,
 		}
 	}
 
+}
+func (peerster *Peerster) areaMessageManagement(areaMessage *messaging.AreaMessage, IPofCar string) {
+	carExists := false
+	peerster.PosCarsInArea.Mutex.Lock()
+	for _, carInfo := range peerster.PosCarsInArea.Slice {
+		if carInfo.IPCar == IPofCar {
+			carInfo.Origin = areaMessage.Origin
+			carInfo.Position = areaMessage.Position
+			peerster.SendTrace(utils.MessageTrace{
+				Type: utils.Police,
+				Text: fmt.Sprintf("RESET TIMER %v", carInfo.Origin),
+			})
+			carInfo.Channel <- false
+			// carInfo.Channel = make(chan bool)
+			carExists = true
+			break
+		}
+	}
+	peerster.PosCarsInArea.Mutex.Unlock()
+	if carExists == false {
+		origin := areaMessage.Origin
+		position := areaMessage.Position
+		peerster.SaveCarInAreaStructure(origin, position, IPofCar)
+	}
 }
 func (peerster *Peerster) SaveCarInAreaStructure(origin string, position utils.Position, IPofCar string) {
 	peerster.PosCarsInArea.Mutex.RLock()
@@ -278,8 +302,9 @@ func (peerster *Peerster) SaveCarInAreaStructure(origin string, position utils.P
 	infoOfCar := &utils.CarInformation{
 		Origin:   origin,
 		Position: position,
-		Channel:  make(chan bool),
+		Channel:  make(chan bool, 1),
 		IPCar:    IPofCar,
+		Active:   false,
 	}
 	peerster.PosCarsInArea.Mutex.Lock()
 	peerster.PosCarsInArea.Slice = append(peerster.PosCarsInArea.Slice, infoOfCar)
@@ -287,25 +312,76 @@ func (peerster *Peerster) SaveCarInAreaStructure(origin string, position utils.P
 	go peerster.timeoutAreaMessage(infoOfCar)
 }
 func (peerster *Peerster) timeoutAreaMessage(infoOfCar *utils.CarInformation) {
-	for {
+	peerster.SendTrace(utils.MessageTrace{
+		Type: utils.Police,
+		Text: fmt.Sprintf("HELLOOOOOOOOOOOOOOOOOOOOOOOOOO %V", infoOfCar.Origin),
+	})
+	delete := true
+	infoOfCar.Active = false
+	for delete {
 		select {
 		// Delete car
 		case deleteCar := <-infoOfCar.Channel:
 			if deleteCar {
-				peerster.PosCarsInArea.Mutex.Lock()
-				for index, carInfo := range peerster.PosCarsInArea.Slice {
-					if carInfo.Origin == infoOfCar.Origin {
-						peerster.PosCarsInArea.Slice = append(peerster.PosCarsInArea.Slice[:index], peerster.PosCarsInArea.Slice[index+1:]...)
-					}
-				}
-				peerster.PosCarsInArea.Mutex.Unlock()
-				break
+				peerster.SendTrace(utils.MessageTrace{
+					Type: utils.Police,
+					Text: fmt.Sprintf("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA BORRAR"),
+				})
+				delete = false
+			} else {
+				delete = true
 			}
 		case <-time.After(TIMEOUTCARS * time.Second):
-			infoOfCar.Channel <- true
+			peerster.SendTrace(utils.MessageTrace{
+				Type: utils.Police,
+				Text: fmt.Sprintf("LLEGOOOOOOOOOOOOOOOOOOOOO BORRAR"),
+			})
+
+			// infoOfCar.Channel <- true
+			delete = false
 		}
 	}
+	infoOfCar.Active = true
+	peerster.SendTrace(utils.MessageTrace{
+		Type: utils.Police,
+		Text: fmt.Sprintf("TRY TO DELETE"),
+	})
+	peerster.deleteCar(infoOfCar)
+
 	// First message from that car
+}
+func (peerster *Peerster) deleteCar(infoOfCar *utils.CarInformation) {
+	peerster.PosCarsInArea.Mutex.Lock()
+	for index, carInfo := range peerster.PosCarsInArea.Slice {
+		peerster.SendTrace(utils.MessageTrace{
+			Type: utils.Police,
+			Text: fmt.Sprintf("Car %v: BEFORE %v LENGTH %v", peerster.Name, carInfo, len(peerster.PosCarsInArea.Slice)),
+		})
+		peerster.SendTrace(utils.MessageTrace{
+			Type: utils.Police,
+			Text: fmt.Sprintf("Memory %v Message %v", carInfo.IPCar, infoOfCar.IPCar),
+		})
+		peerster.SendTrace(utils.MessageTrace{
+			Type: utils.Police,
+			Text: fmt.Sprintf("--------------------------"),
+		})
+
+		//Delete the car except if it is the police which we always allow
+		if (carInfo.IPCar == infoOfCar.IPCar) && (carInfo.IPCar != "127.0.0.1:5555") {
+			peerster.PosCarsInArea.Slice = append(peerster.PosCarsInArea.Slice[:index], peerster.PosCarsInArea.Slice[index+1:]...)
+			peerster.SendTrace(utils.MessageTrace{
+				Type: utils.Police,
+				Text: fmt.Sprintf("Car %v: AFTER %v LENGTH %v", peerster.Name, carInfo, len(peerster.PosCarsInArea.Slice)),
+			})
+
+			peerster.SendTrace(utils.MessageTrace{
+				Type: utils.Police,
+				Text: fmt.Sprintf("--------------------------"),
+			})
+			break
+		}
+	}
+	peerster.PosCarsInArea.Mutex.Unlock()
 }
 func (peerster *Peerster) handleIncomingResolutionM(colisionMessage *messaging.ColisionResolution, addr string) {
 	if colisionMessage == nil {
