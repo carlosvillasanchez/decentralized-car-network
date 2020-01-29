@@ -117,9 +117,6 @@ func createPeerster(gossipAddr *string, mapString *string, name *string, peers *
 			Mutex: sync.RWMutex{},
 		},
 	}
-	for _, v := range areaPeersList {
-		peerster.SaveCarInAreaStructure("", utils.Position{}, v)
-	}
 
 	return peerster
 }
@@ -156,6 +153,13 @@ func Start(gossipAddr *string, mapString *string, name *string, peers *string, a
 
 	//Moves the car in the map
 	peerster.MoveCarPosition()
+	areaPeersList := []string{}
+	if *areaPeers != "" {
+		areaPeersList = strings.Split(*areaPeers, ",")
+	}
+	for _, v := range areaPeersList {
+		peerster.SaveCarInAreaStructure("", utils.Position{}, v)
+	}
 
 	//Handles all the incoming messages and the responses
 	peerster.Listen(gossiper.Server)

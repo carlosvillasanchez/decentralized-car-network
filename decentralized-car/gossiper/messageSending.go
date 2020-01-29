@@ -19,8 +19,8 @@ func (peerster *Peerster) BroadcastCarPosition() {
 		Area: &areaMessage,
 	}
 	var blacklist []string
-
 	peerster.PosCarsInArea.Mutex.RLock()
+
 	for i := range peerster.PosCarsInArea.Slice {
 		peer := peerster.PosCarsInArea.Slice[i].IPCar
 		err := peerster.sendToPeer(peer, packet, blacklist)

@@ -49,10 +49,6 @@ func (peerster *Peerster) handleIncomingAreaChange(message messaging.RumorMessag
 	// Someone wants to move to a position.
 	// Check if we are in that position. If we are, send an AreaChangeResponse back saying fuck off
 	// If not, what do we do? anyway we add the ip to our known peers
-	peerster.SendTrace(utils.MessageTrace{
-		Type: utils.Police,
-		Text: fmt.Sprintf("Change of area add %v,", message.Origin),
-	})
 	peerster.SaveCarInAreaStructure(message.Origin, message.AreaChangeMessage.CurrentPosition, message.AreaChangeMessage.IpofCarChanging)
 	for _, v := range peerster.PosCarsInArea.Slice {
 		fmt.Printf("POS CARS IN AREA:  %+v \n", v)

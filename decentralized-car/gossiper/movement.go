@@ -39,22 +39,13 @@ func (peerster *Peerster) MoveCarPosition() {
 			// If it is a police car stopped don't do anything
 
 			time.Sleep(time.Duration(MovementTimer) * time.Second) //TODO moved this out of the if, si that ok?
-			fmt.Println("Pepe", peerster.Name)
 			for _, value := range peerster.PosCarsInArea.Slice {
 
 				peerster.SendTrace(utils.MessageTrace{
-					Type: utils.Police,
+					Type: utils.Other,
 					Text: fmt.Sprintf("Car %v: knowing %v", peerster.Name, value),
 				})
 			}
-			peerster.SendTrace(utils.MessageTrace{
-				Type: utils.Police,
-				Text: fmt.Sprintf("--------------------------"),
-			})
-			peerster.SendTrace(utils.MessageTrace{
-				Type: utils.Police,
-				Text: fmt.Sprintf("NEWSGROUPS %v:", peerster.Newsgroups),
-			})
 			if peerster.PathCar != nil && !peerster.isLastPosition() {
 				areaChange := peerster.changeOfArea()
 				//There is a change in the area zone, so different procedure
@@ -149,6 +140,7 @@ func (peerster *Peerster) positionAdvancer() {
 }
 func (peerster *Peerster) collisionChecker() bool {
 	peerster.PosCarsInArea.Mutex.Lock()
+
 	defer peerster.PosCarsInArea.Mutex.Unlock()
 	for _, carInfo := range peerster.PosCarsInArea.Slice {
 		//If a car is in the position we want to move to, there is a collision
