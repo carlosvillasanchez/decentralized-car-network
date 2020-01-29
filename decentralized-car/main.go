@@ -10,10 +10,12 @@ import (
 	"sync"
 	"time"
 
+	"crypto/rsa"
+
 	"github.com/tormey97/decentralized-car-network/decentralized-car/gossiper"
 	"github.com/tormey97/decentralized-car-network/decentralized-car/messaging"
 	"github.com/tormey97/decentralized-car-network/utils"
-	"crypto/rsa"
+
 	//rand2 "crypto/rand"
 	"crypto"
 )
@@ -37,7 +39,7 @@ var emptyMap = [][]string{
 	{"N", "N", "N", "N", "N", "N", "N", "N", "N"},
 }
 
-func createPeerster(gossipAddr *string, mapString *string, name *string, peers *string, antiEntropy *int, rTimer *int, startPosition *string, endPosition *string, areaPeers *string, sk rsa.PrivateKey, pk rsa.PublicKey, policePk rsa.PublicKey, WT bool, trustIn []string, pksTrust map[string]rsa.PublicKey, signatures map[string][]byte)  gossiper.Peerster {
+func createPeerster(gossipAddr *string, mapString *string, name *string, peers *string, antiEntropy *int, rTimer *int, startPosition *string, endPosition *string, areaPeers *string, sk rsa.PrivateKey, pk rsa.PublicKey, policePk rsa.PublicKey, WT bool, trustIn []string, pksTrust map[string]rsa.PublicKey, signatures map[string][]byte) gossiper.Peerster {
 
 	UIPort := "8080"
 	fmt.Println("STARTING!!", trustIn)
@@ -60,12 +62,7 @@ func createPeerster(gossipAddr *string, mapString *string, name *string, peers *
 	if *peers != "" {
 		peersList = strings.Split(*peers, ",")
 	}
-	areaPeersList := []string{}
-	if *areaPeers != "" {
-		areaPeersList = strings.Split(*areaPeers, ",")
 
-	}
-	
 	// Creation of the map, if empty put the empty map
 	var carMap [10][10]utils.Square
 	if *mapString == "" {
@@ -96,13 +93,16 @@ func createPeerster(gossipAddr *string, mapString *string, name *string, peers *
 		CarMap:           &finalCarMap,
 		PathCar:          carPath,
 		BroadcastTimer:   gossiper.BroadcastTimer,
-		Sk:				  sk,
-		Pk:				  pk,
-		PolicePk:		  policePk,
-		WT: 			  WT,
-		TrustedCars: 	  trustIn,
+		Sk:               sk,
+		Pk:               pk,
+		PolicePk:         policePk,
+		WT:               WT,
+		TrustedCars:      trustIn,
 		PksOfTrustedCars: pksTrust,
-		Signatures:		  signatures,
+		Signatures:       signatures,
+		AreaChangeSession: gossiper.AreaChangeSession{
+			Channel: make(chan bool, 1),
+		},
 		PosCarsInArea: utils.CarInfomartionList{
 			Slice: make([]*utils.CarInformation, 0),
 			Mutex: sync.RWMutex{},
@@ -140,9 +140,6 @@ func createPeerster(gossipAddr *string, mapString *string, name *string, peers *
 			Mutex: sync.RWMutex{},
 		},
 	}
-	for _, v := range areaPeersList {
-		peerster.SaveCarInAreaStructure("", utils.Position{}, v)
-	}
 
 	return peerster
 }
@@ -173,12 +170,51 @@ func Start(gossipAddr *string, mapString *string, name *string, peers *string, a
 		}
 	}()
 
+	//Rumors the car position in the current area of the car
+	go func() {
+		for {
+			time.Sleep(time.Duration(4) * time.Second)
+			peerster.SendAreaChangeMessage(peerster.PathCar[0])
+		}
+	}()
+	go func() {
+		for {
+			time.Sleep(time.Duration(4) * time.Second)
+			peerster.SendTrace(utils.MessageTrace{
+				Type: utils.Police,
+				Text: fmt.Sprintf("Path status %v", peerster.PathCar),
+			})
+			peerster.SendTrace(utils.MessageTrace{
+				Type: utils.Police,
+				Text: fmt.Sprintf("Status area %v", peerster.AreaChangeSession.Active),
+			})
+			for _, value := range peerster.PosCarsInArea.Slice {
+
+				peerster.SendTrace(utils.MessageTrace{
+					Type: utils.Police,
+					Text: fmt.Sprintf("Car %v: knowing %v", peerster.Name, value),
+				})
+			}
+			peerster.SendTrace(utils.MessageTrace{
+				Type: utils.Police,
+				Text: fmt.Sprintf("-------------------------------------------"),
+			})
+
+		}
+	}()
 	//Rutine that sends information to the server
 	peerster.SendInfoToServer()
 	// peerster.Listen(gossiper.Client)
 
 	//Moves the car in the map
 	peerster.MoveCarPosition()
+	areaPeersList := []string{}
+	if *areaPeers != "" {
+		areaPeersList = strings.Split(*areaPeers, ",")
+	}
+	for _, v := range areaPeersList {
+		peerster.SaveCarInAreaStructure("", utils.Position{}, v)
+	}
 
 	//Handles all the incoming messages and the responses
 	peerster.Listen(gossiper.Server)

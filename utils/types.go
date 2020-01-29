@@ -72,6 +72,7 @@ type CarInformation struct {
 	Position Position
 	IPCar    string
 	Channel  chan bool
+	Active   bool
 }
 type CarInfomartionList struct {
 	Slice []*CarInformation

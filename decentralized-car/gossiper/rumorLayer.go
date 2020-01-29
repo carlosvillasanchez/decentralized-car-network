@@ -19,14 +19,14 @@ type AreaChangeSession struct {
 	CollisionCount int
 }
 
-func (peerster *Peerster) sendAreaChangeMessage(pos utils.Position) {
+func (peerster *Peerster) SendAreaChangeMessage(pos utils.Position) {
 	message := messaging.AreaChangeMessage{
 		NextPosition:    pos,
 		CurrentPosition: peerster.PathCar[0],
 		IpofCarChanging: peerster.GossipAddress,
 	}
 	rumorMessage := messaging.RumorMessage{
-		Newsgroup:         strconv.Itoa(utils.AreaPositioner(peerster.PathCar[1])), //TODO get newsgroup
+		Newsgroup:         strconv.Itoa(utils.AreaPositioner(pos)), //TODO get newsgroup
 		AreaChangeMessage: &message,
 		AccidentMessage:   nil,
 	}
@@ -54,9 +54,6 @@ func (peerster *Peerster) handleIncomingAreaChange(message messaging.RumorMessag
 	// Check if we are in that position. If we are, send an AreaChangeResponse back saying fuck off
 	// If not, what do we do? anyway we add the ip to our known peers
 	peerster.SaveCarInAreaStructure(message.Origin, message.AreaChangeMessage.CurrentPosition, message.AreaChangeMessage.IpofCarChanging)
-	for _, v := range peerster.PosCarsInArea.Slice {
-		fmt.Printf("POS CARS IN AREA:  %+v \n", v)
-	}
 	/*
 		This code sends a specific response if there is a conflict, but I think that's not actually necessary.
 		if peerster.PathCar[0] == message.AreaChangeMessage.NextPositionPosition {

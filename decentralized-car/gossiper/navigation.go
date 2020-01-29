@@ -2,6 +2,7 @@ package gossiper
 
 import (
 	"container/heap"
+
 	"github.com/tormey97/decentralized-car-network/utils"
 )
 
@@ -153,4 +154,5 @@ func CreatePath(
 		return path
 	}
 	return nil
+
 }

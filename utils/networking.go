@@ -105,10 +105,6 @@ func SliceEqual(a, b []string) bool {
 	}
 	return true
 }
-func CreatePath(carMap SimulatedMap, startP, endP Position) []Position {
-	var dummy []Position
-	return dummy
-}
 
 // This functions return the area of the given position
 func AreaPositioner(position Position) int {
