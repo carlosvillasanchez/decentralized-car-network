@@ -15,6 +15,7 @@ import (
 	"github.com/tormey97/decentralized-car-network/utils"
 	"crypto/rsa"
 	randCrytpo "crypto/rand"
+	keyParser "crypto/x509"
 )
 
 type Origin int
@@ -52,6 +53,10 @@ type Peerster struct {
 	Sk				  rsa.PrivateKey
 	Pk				  rsa.PublicKey
 	PolicePk		  rsa.PublicKey
+	WT 				  bool
+	TrustedCars		  []string
+	PksOfTrustedCars  map[string]rsa.PublicKey
+	Signatures	      map[string][]byte
 	ColisionInfo      utils.ColisionInformation
 	AreaChangeSession
 	CarsInterestedSpot messaging.SpotInformation
@@ -278,7 +283,7 @@ func (peerster *Peerster) SaveCarInAreaStructure(origin string, position utils.P
 			return // car already exists
 		}
 	}
-	fmt.Println("Salvando chaval", IPofCar)
+	//fmt.Println("Salvando chaval", IPofCar)
 	peerster.PosCarsInArea.Mutex.RUnlock()
 	infoOfCar := &utils.CarInformation{
 		Origin:   origin,
@@ -316,9 +321,6 @@ func (peerster *Peerster) handleIncomingResolutionM(colisionMessage *messaging.C
 	if colisionMessage == nil {
 		return
 	}
-	if *colisionMessage == (messaging.ColisionResolution{}) {
-		return
-	}
 	// If he is asking for another position, we ignore him
 	if (colisionMessage.Position != peerster.PathCar[0]) && (colisionMessage.Position.X != -1) {
 		peerster.ColisionInfo.IPCar = addr
@@ -326,6 +328,25 @@ func (peerster *Peerster) handleIncomingResolutionM(colisionMessage *messaging.C
 		peerster.SendNegotiationMessage()
 		return
 	}
+	// Adding to list of trusted
+	if peerster.WT {
+		_, alreadyKnown := peerster.PksOfTrustedCars[colisionMessage.Origin]
+		if !alreadyKnown {
+			peerster.TrustedCars = append(peerster.TrustedCars, colisionMessage.Origin)
+			newPk, err := keyParser.ParsePKCS1PublicKey(colisionMessage.Pk)
+			if err != nil {
+				fmt.Println("ERROR PARSING", err)
+			}
+			peerster.PksOfTrustedCars[colisionMessage.Origin] = *newPk
+			peerster.Signatures[colisionMessage.Origin] = colisionMessage.Signature
+			peerster.SendTrace(utils.MessageTrace{
+				Type: utils.Other,
+				Text: "Car " + colisionMessage.Origin + " now trusts me",
+			})
+		}
+	}
+	
+
 	//This means that this message is the response to our coin flip
 	if peerster.ColisionInfo.CoinFlip != 0 {
 		hisCoinFlip := colisionMessage.CoinResult
@@ -361,6 +382,7 @@ func (peerster *Peerster) handleIncomingResolutionM(colisionMessage *messaging.C
 	}
 
 }
+
 func (peerster *Peerster) handleIncomingAccidentMessage(alertToPolice *messaging.PrivateMessage) {
 	if alertToPolice == nil {
 		return
@@ -732,7 +754,9 @@ func (peerster *Peerster) serverReceive(buffer []byte, originAddr net.UDPAddr) {
 			addr = receivedPacket.Simple.RelayPeerAddr
 		}
 		peerster.addToKnownPeers(addr)
-
+		if (receivedPacket.Colision != nil){
+			fmt.Println("AJA!")
+		}
 		//Function only checked by police car
 		if peerster.Name == utils.Police {
 			peerster.handleIncomingAccidentMessage(receivedPacket.Private)
@@ -947,9 +971,11 @@ func (peerster Peerster) sendToPeer(peer string, packet messaging.GossipPacket, 
 			return fmt.Errorf("peer %q is blacklisted")
 		}
 	}
-
 	if packet.Rumor != nil {
 		//fmt.Printf("MONGERING with %s \n", peer)
+	}
+	if (packet.Colision != nil){
+		fmt.Println("AJA 2")
 	}
 	peerAddr := utils.StringAddrToUDPAddr(peer)
 	packetBytes, err := protobuf.Encode(&packet)

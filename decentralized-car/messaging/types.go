@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	"github.com/tormey97/decentralized-car-network/utils"
+	//"crypto/rsa"
 )
 
 type SimpleMessage struct {
@@ -79,13 +80,15 @@ type Message struct {
 }
 type SpotPublishMessage struct {
 	Position utils.Position
+	Signatures map[string][]byte
+	IP string
 }
 
 // It is publish as a rumor message
-type SpotPublicationSession struct {
+/*type SpotPublicationSession struct {
 	Message SpotPublishMessage
 	Channel chan bool
-}
+}*/
 
 // It goes as a private message
 type SpotPublicationRequest struct {
@@ -110,6 +113,8 @@ type ColisionResolution struct {
 	Origin     string
 	CoinResult int
 	Position   utils.Position
+	Pk		   []byte
+	Signature  []byte
 }
 
 // type Position struct {

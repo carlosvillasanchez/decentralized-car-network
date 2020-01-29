@@ -15,6 +15,7 @@ import (
 	"github.com/tormey97/decentralized-car-network/utils"
 	"crypto/rsa"
 	//rand2 "crypto/rand"
+	"crypto"
 )
 
 type Origin int
@@ -36,11 +37,24 @@ var emptyMap = [][]string{
 	{"N", "N", "N", "N", "N", "N", "N", "N", "N"},
 }
 
-func createPeerster(gossipAddr *string, mapString *string, name *string, peers *string, antiEntropy *int, rTimer *int, startPosition *string, endPosition *string, areaPeers *string, sk rsa.PrivateKey, pk rsa.PublicKey, policePk rsa.PublicKey) gossiper.Peerster {
+func createPeerster(gossipAddr *string, mapString *string, name *string, peers *string, antiEntropy *int, rTimer *int, startPosition *string, endPosition *string, areaPeers *string, sk rsa.PrivateKey, pk rsa.PublicKey, policePk rsa.PublicKey, WT bool, trustIn []string, pksTrust map[string]rsa.PublicKey, signatures map[string][]byte)  gossiper.Peerster {
 
 	UIPort := "8080"
-	fmt.Println("STARTING!!")
+	fmt.Println("STARTING!!", trustIn)
 	simple := false
+
+	for _, trust := range trustIn {
+		pkToVerify := pksTrust[trust]
+		newhash := crypto.SHA256
+		toSing := []byte(*gossipAddr)
+		pssh := newhash.New()
+		pssh.Write(toSing)
+		hashed := pssh.Sum(nil)
+		err := rsa.VerifyPKCS1v15(&pkToVerify, newhash, hashed, signatures[trust])
+		if err != nil {
+			fmt.Println("NOT VERFIED")
+		}
+	}
 
 	peersList := []string{}
 	if *peers != "" {
@@ -70,7 +84,7 @@ func createPeerster(gossipAddr *string, mapString *string, name *string, peers *
 	if (startPositionP.X != -1) && (startPositionP.Y != -1) {
 		carPath = gossiper.CreatePath(&finalCarMap, startPositionP, endPositionP, []utils.Position{})
 	}
-	fmt.Println("CARPATH", carPath, finalCarMap, startPositionP, endPositionP)
+	//fmt.Println("CARPATH", carPath, finalCarMap, startPositionP, endPositionP)
 
 	peerster := gossiper.Peerster{
 		UIPort:           UIPort,
@@ -85,6 +99,10 @@ func createPeerster(gossipAddr *string, mapString *string, name *string, peers *
 		Sk:				  sk,
 		Pk:				  pk,
 		PolicePk:		  policePk,
+		WT: 			  WT,
+		TrustedCars: 	  trustIn,
+		PksOfTrustedCars: pksTrust,
+		Signatures:		  signatures,
 		PosCarsInArea: utils.CarInfomartionList{
 			Slice: make([]*utils.CarInformation, 0),
 			Mutex: sync.RWMutex{},
@@ -133,8 +151,8 @@ func init() {
 	rand.Seed(time.Now().UTC().UnixNano())
 }
 
-func Start(gossipAddr *string, mapString *string, name *string, peers *string, antiEntropy *int, rTimer *int, startPosition *string, endPosition *string, areaPeers *string, parkingSearch *bool, sk rsa.PrivateKey, pk rsa.PublicKey, policePk rsa.PublicKey) {
-	peerster := createPeerster(gossipAddr, mapString, name, peers, antiEntropy, rTimer, startPosition, endPosition, areaPeers, sk, pk, policePk)
+func Start(gossipAddr *string, mapString *string, name *string, peers *string, antiEntropy *int, rTimer *int, startPosition *string, endPosition *string, areaPeers *string, parkingSearch *bool, sk rsa.PrivateKey, pk rsa.PublicKey, policePk rsa.PublicKey, WT bool, trustIn []string, pksTrust map[string]rsa.PublicKey, signatures map[string][]byte) {
+	peerster := createPeerster(gossipAddr, mapString, name, peers, antiEntropy, rTimer, startPosition, endPosition, areaPeers, sk, pk, policePk, WT, trustIn, pksTrust, signatures)
 	fmt.Println(*name)
 	for _, value := range peerster.PosCarsInArea.Slice {
 		fmt.Printf("%+v\n", value)

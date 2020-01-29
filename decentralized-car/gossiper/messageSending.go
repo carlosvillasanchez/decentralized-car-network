@@ -8,6 +8,10 @@ import (
 	"github.com/dedis/protobuf"
 	"github.com/tormey97/decentralized-car-network/decentralized-car/messaging"
 	"github.com/tormey97/decentralized-car-network/utils"
+	"crypto/rsa"
+	keyParser "crypto/x509"
+	"crypto"
+	"crypto/rand"
 )
 
 func (peerster *Peerster) BroadcastCarPosition() {
@@ -61,11 +65,24 @@ func (peerster *Peerster) SendPosToServer() {
 
 func (peerster *Peerster) SendNegotiationMessage() {
 	var colisionMessage messaging.ColisionResolution
+	var pkParsed []byte
+	var signature []byte
+	if peerster.WT {
+		toSing := []byte(peerster.ColisionInfo.IPCar)
+		newhash := crypto.SHA256
+		pssh := newhash.New()
+		pssh.Write(toSing)
+		hashed := pssh.Sum(nil)
+		signature, _ = rsa.SignPKCS1v15(rand.Reader, &peerster.Sk, newhash, hashed) 
+		pkParsed = keyParser.MarshalPKCS1PublicKey(&peerster.Pk)
+	}
 	if len(peerster.PathCar) != 1 {
 		colisionMessage = messaging.ColisionResolution{
 			Origin:     peerster.Name,
 			CoinResult: peerster.ColisionInfo.CoinFlip,
 			Position:   peerster.PathCar[1],
+			Pk: 		pkParsed,
+			Signature:  signature,
 		}
 		// If we are stopped we will send our current position
 	} else {
@@ -77,12 +94,28 @@ func (peerster *Peerster) SendNegotiationMessage() {
 			Origin:     peerster.Name,
 			CoinResult: peerster.ColisionInfo.CoinFlip,
 			Position:   positionAux,
+			Pk: 		pkParsed,
+			Signature:  signature,
 		}
 	}
+	/*if peerster.WT {
+		toSing := []byte(peerster.ColisionInfo.IPCar)
+		newhash := crypto.SHA256
+		pssh := newhash.New()
+		pssh.Write(toSing)
+		hashed := pssh.Sum(nil)
+		signature, err := rsa.SignPKCS1v15(rand.Reader, &peerster.Sk, newhash, hashed) 
+		if err != nil {
+			fmt.Println("ERROR SIGNING", err)
+		}
+		colisionMessage.Pk = peerster.Pk
+		//colisionMessage.Signature = signature
+	}*/
 
 	packet := messaging.GossipPacket{
 		Colision: &colisionMessage,
 	}
+	fmt.Println("ICIII", packet.Colision != nil)
 	var blacklist []string
 	peerster.sendToPeer(peerster.ColisionInfo.IPCar, packet, blacklist)
 }

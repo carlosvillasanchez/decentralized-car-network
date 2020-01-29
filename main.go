@@ -21,6 +21,7 @@ import (
 	"flag"
 	"crypto/rsa"
 	"crypto/rand"
+	"crypto"
 )
 
 const (
@@ -95,6 +96,7 @@ type ServerMessage struct {
 func main() {
 	var webOfTrust bool
 	flag.BoolVar(&webOfTrust, "wt", false, "add a web of trust")
+	flag.Parse()
 	cmd := exec.Command("whoami")
 	var out bytes.Buffer
 	cmd.Stdout = &out
@@ -266,7 +268,9 @@ func (centralServer *CentralServer) startNodes() {
 	sks := make(map[string]rsa.PrivateKey)
 	pks := make(map[string]rsa.PublicKey)
 	areas := make(map[string][]string)
-	centralServer.carsMutex.RLock()
+	producer_aux := 0
+	producers := make(map[string][]string)
+	centralServer.carsMutex.Lock()
 	for i, car := range centralServer.Cars {
 		var flags_aux []string
 
@@ -310,24 +314,35 @@ func (centralServer *CentralServer) startNodes() {
 		pk := sk.PublicKey
 		sks[car.Id] = *sk
 		pks[car.Id] = pk
+		// Producer
+		if car.Id != "police" {
+			producers[strconv.Itoa(int(producer_aux%6/2))] = append(producers[strconv.Itoa(int(producer_aux%6/2))], car.Id)
+			flags_aux = append(flags_aux, strconv.Itoa(int(producer_aux%6/2)))
+			producer_aux++
+
+		}else{
+			flags_aux = append(flags_aux, "police")
+		}
 
 		ids = append(ids, i)
 
 		flags = append(flags, flags_aux)
 	}
-	centralServer.carsMutex.RUnlock()
+	centralServer.carsMutex.Unlock()
 
 	var budgetParking int
 
 	budgetParking = int(len(centralServer.Cars)/6) + 1
-
+	
+	fmt.Println("PRODUCERS: ", producers)
+	fmt.Println("NUMBER OF NODES:", len(flags))
 	for _, flag_array := range flags {
 		parking := false
 		if budgetParking != 0 && flag_array[2] != "police" {
 			parking = true
 			budgetParking--
 		}
-		go centralServer.startNode(flag_array, areas, parking, sks, pks)
+		go centralServer.startNode(flag_array, areas, parking, sks, pks, producers)
 		time.Sleep(time.Millisecond * 200)
 	}
 }
@@ -335,7 +350,7 @@ func (centralServer *CentralServer) startNodes() {
 /***
 * Starting 1 node
 ***/
-func (centralServer *CentralServer) startNode(flags []string, areas map[string][]string, parking bool, sks map[string]rsa.PrivateKey, pks map[string]rsa.PublicKey) {
+func (centralServer *CentralServer) startNode(flags []string, areas map[string][]string, parking bool, sks map[string]rsa.PrivateKey, pks map[string]rsa.PublicKey, producers map[string][]string) {
 	//var neighbours *string
 	neighbours := ""
 	for _, addrs := range areas[flags[8]] {
@@ -346,14 +361,48 @@ func (centralServer *CentralServer) startNode(flags []string, areas map[string][
 	if len(neighbours) != 0 {
 		neighbours = neighbours[:len(neighbours)-1]
 	}
-	fmt.Println("NODE", flags[2], "POS", flags[6], "AREA", flags[8], "NEIGHBOURS", neighbours, "PARKING", parking)
-
+	centralServer.carsMutex.Lock()
+	car, _ := centralServer.Cars[flags[0]]
+	if parking {
+		car.Messages = append(car.Messages, MessageTrace{
+			Type: Other,
+			Text: "(" + strconv.Itoa(car.DestinationX) + ", " + strconv.Itoa(car.DestinationY) + ") I am Car " + car.Id + " from producer " + flags[9] + ". I am looking for parking spots!",
+		})
+	}else{
+		car.Messages = append(car.Messages, MessageTrace{
+			Type: Other,
+			Text: "(" + strconv.Itoa(car.DestinationX) + ", " + strconv.Itoa(car.DestinationY) + ") I am Car " + car.Id + " from producer " + flags[9],
+		})
+	}
+	centralServer.Cars[car.IP + ":" + car.Port] = car
+	centralServer.carsMutex.Unlock()
 	antiEntropy, _ := strconv.Atoi(flags[4])
 	rTimer, _ := strconv.Atoi(flags[5])
 	sk := sks[flags[2]]
 	pk := pks[flags[2]]
 	policePk := pks["police"]
-	carDecentralized.Start(&flags[0], &flags[1], &flags[2], &flags[3], &antiEntropy, &rTimer, &flags[6], &flags[7], &neighbours, &parking, sk, pk, policePk)
+	//WT
+	var trustIn []string
+	pksTrust := make(map[string]rsa.PublicKey)
+	signatures := make(map[string][]byte)
+	if centralServer.WT {
+		trustIn = producers[flags[9]]
+		for _, id := range trustIn {
+			pksTrust[id] = pks[id]
+			toSing := []byte(flags[0])
+			skToSing := sks[id]
+			newhash := crypto.SHA256
+			pssh := newhash.New()
+			pssh.Write(toSing)
+			hashed := pssh.Sum(nil)
+			signature, err := rsa.SignPKCS1v15(rand.Reader, &skToSing, newhash, hashed) 
+			if err != nil {
+				fmt.Println("ERROR SIGNING", err)
+			}
+			signatures[id] = signature
+		}
+	}
+	carDecentralized.Start(&flags[0], &flags[1], &flags[2], &flags[3], &antiEntropy, &rTimer, &flags[6], &flags[7], &neighbours, &parking, sk, pk, policePk, centralServer.WT, trustIn, pksTrust, signatures)
 
 }
 

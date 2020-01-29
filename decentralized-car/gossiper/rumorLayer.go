@@ -7,6 +7,8 @@ import (
 
 	"github.com/tormey97/decentralized-car-network/decentralized-car/messaging"
 	"github.com/tormey97/decentralized-car-network/utils"
+	"crypto"
+	"crypto/rsa"
 )
 
 type AreaChangeSession struct {
@@ -33,6 +35,8 @@ func (peerster *Peerster) sendAreaChangeMessage(pos utils.Position) {
 func (peerster *Peerster) SendFreeSpotMessage() {
 	message := messaging.SpotPublishMessage{
 		Position: peerster.PathCar[0],
+		Signatures: peerster.Signatures,
+		IP: peerster.GossipAddress,
 	}
 	rumorMessage := messaging.RumorMessage{
 		SpotPublishMessage: &message,
@@ -70,6 +74,36 @@ func (peerster *Peerster) handleIncomingFreeSpotMessage(message messaging.RumorM
 	//To avoid requesting the spot two times
 	if peerster.PostulatedAlready == true {
 		return
+	}
+	if peerster.WT {
+		verified := false
+		for _, trustedCar := range peerster.TrustedCars {
+			signature, ok := message.SpotPublishMessage.Signatures[trustedCar]
+			if ok {
+				pkToVerify := peerster.PksOfTrustedCars[trustedCar]
+				newhash := crypto.SHA256
+				toSing := []byte(message.SpotPublishMessage.IP)
+				pssh := newhash.New()
+				pssh.Write(toSing)
+				hashed := pssh.Sum(nil)
+				err := rsa.VerifyPKCS1v15(&pkToVerify, newhash, hashed, signature)
+				if err == nil {
+					verified = true
+					peerster.SendTrace(utils.MessageTrace{
+						Type: utils.Parking,
+						Text: "Parking spot announcer (" + message.SpotPublishMessage.IP + ") verified with car " + trustedCar,
+					})
+					break
+				}
+			}
+		}
+		if verified == false {
+			peerster.SendTrace(utils.MessageTrace{
+				Type: utils.Parking,
+				Text: "Parking spot announcer (" + message.SpotPublishMessage.IP + ") not verified",
+			})
+			return
+		}
 	}
 	fmt.Println("DDDDDDDDDDDDDDDDD")
 	request := messaging.SpotPublicationRequest{
