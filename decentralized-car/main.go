@@ -44,12 +44,7 @@ func createPeerster(gossipAddr *string, mapString *string, name *string, peers *
 	if *peers != "" {
 		peersList = strings.Split(*peers, ",")
 	}
-	areaPeersList := []string{}
-	if *areaPeers != "" {
-		areaPeersList = strings.Split(*areaPeers, ",")
 
-	}
-	fmt.Println("prueba", areaPeersList)
 	// Creation of the map, if empty put the empty map
 	var carMap [10][10]utils.Square
 	if *mapString == "" {
@@ -80,6 +75,9 @@ func createPeerster(gossipAddr *string, mapString *string, name *string, peers *
 		CarMap:           &finalCarMap,
 		PathCar:          carPath,
 		BroadcastTimer:   gossiper.BroadcastTimer,
+		AreaChangeSession: gossiper.AreaChangeSession{
+			Channel: make(chan bool, 1),
+		},
 		PosCarsInArea: utils.CarInfomartionList{
 			Slice: make([]*utils.CarInformation, 0),
 			Mutex: sync.RWMutex{},
@@ -147,6 +145,38 @@ func Start(gossipAddr *string, mapString *string, name *string, peers *string, a
 		}
 	}()
 
+	//Rumors the car position in the current area of the car
+	go func() {
+		for {
+			time.Sleep(time.Duration(4) * time.Second)
+			peerster.SendAreaChangeMessage(peerster.PathCar[0])
+		}
+	}()
+	go func() {
+		for {
+			time.Sleep(time.Duration(4) * time.Second)
+			peerster.SendTrace(utils.MessageTrace{
+				Type: utils.Police,
+				Text: fmt.Sprintf("Path status %v", peerster.PathCar),
+			})
+			peerster.SendTrace(utils.MessageTrace{
+				Type: utils.Police,
+				Text: fmt.Sprintf("Status area %v", peerster.AreaChangeSession.Active),
+			})
+			for _, value := range peerster.PosCarsInArea.Slice {
+
+				peerster.SendTrace(utils.MessageTrace{
+					Type: utils.Police,
+					Text: fmt.Sprintf("Car %v: knowing %v", peerster.Name, value),
+				})
+			}
+			peerster.SendTrace(utils.MessageTrace{
+				Type: utils.Police,
+				Text: fmt.Sprintf("-------------------------------------------"),
+			})
+
+		}
+	}()
 	//Rutine that sends information to the server
 	peerster.SendInfoToServer()
 	// peerster.Listen(gossiper.Client)

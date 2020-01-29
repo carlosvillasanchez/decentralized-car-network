@@ -2,8 +2,9 @@ package gossiper
 
 import (
 	"fmt"
-	utils2 "github.com/tormey97/decentralized-car-network/utils"
 	"time"
+
+	utils2 "github.com/tormey97/decentralized-car-network/utils"
 
 	"github.com/dedis/protobuf"
 	"github.com/tormey97/decentralized-car-network/decentralized-car/messaging"
@@ -33,6 +34,7 @@ func (peerster *Peerster) BroadcastCarPosition() {
 }
 
 func (peerster *Peerster) SendTrace(trace utils2.MessageTrace) {
+	trace.Text = fmt.Sprintf("Car %v: ", peerster.Name) + trace.Text
 	packet := utils.ServerNodeMessage{
 		Position: nil,
 		Trace:    &trace,

@@ -17,18 +17,34 @@ type AreaChangeSession struct {
 	CollisionCount int
 }
 
-func (peerster *Peerster) sendAreaChangeMessage(pos utils.Position) {
+func (peerster *Peerster) SendAreaChangeMessage(pos utils.Position) {
+	peerster.SendTrace(utils.MessageTrace{
+		Type: utils.Crash,
+		Text: fmt.Sprintf("This is a trace 12312312312: %v", peerster.Name),
+	})
 	message := messaging.AreaChangeMessage{
 		NextPosition:    pos,
 		CurrentPosition: peerster.PathCar[0],
 		IpofCarChanging: peerster.GossipAddress,
 	}
+	peerster.SendTrace(utils.MessageTrace{
+		Type: utils.Crash,
+		Text: fmt.Sprintf("This is a trace jiadojasd: %v", peerster.Name),
+	})
 	rumorMessage := messaging.RumorMessage{
-		Newsgroup:         strconv.Itoa(utils.AreaPositioner(peerster.PathCar[1])), //TODO get newsgroup
+		Newsgroup:         strconv.Itoa(utils.AreaPositioner(pos)), //TODO get newsgroup
 		AreaChangeMessage: &message,
 		AccidentMessage:   nil,
 	}
+	peerster.SendTrace(utils.MessageTrace{
+		Type: utils.Crash,
+		Text: fmt.Sprintf("This is a trace 125121sadsaxzxz6: %v", peerster.Name),
+	})
 	peerster.sendNewRumorMessage(rumorMessage)
+	peerster.SendTrace(utils.MessageTrace{
+		Type: utils.Crash,
+		Text: fmt.Sprintf("This is a trace 5edsfddsdldld6: %v", peerster.Name),
+	})
 }
 func (peerster *Peerster) SendFreeSpotMessage() {
 	message := messaging.SpotPublishMessage{
@@ -50,9 +66,6 @@ func (peerster *Peerster) handleIncomingAreaChange(message messaging.RumorMessag
 	// Check if we are in that position. If we are, send an AreaChangeResponse back saying fuck off
 	// If not, what do we do? anyway we add the ip to our known peers
 	peerster.SaveCarInAreaStructure(message.Origin, message.AreaChangeMessage.CurrentPosition, message.AreaChangeMessage.IpofCarChanging)
-	for _, v := range peerster.PosCarsInArea.Slice {
-		fmt.Printf("POS CARS IN AREA:  %+v \n", v)
-	}
 	/*
 		This code sends a specific response if there is a conflict, but I think that's not actually necessary.
 		if peerster.PathCar[0] == message.AreaChangeMessage.NextPositionPosition {
