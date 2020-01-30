@@ -11,9 +11,7 @@ import (
 
 	//"math/rand"
 	//"encoding/json"
-	"bytes"
 	"net"
-	"os/exec"
 	"sync"
 	"time"
 
@@ -101,14 +99,6 @@ func main() {
 	flag.BoolVar(&webOfTrust, "wt", false, "add a web of trust")
 	flag.BoolVar(&verbose, "v", false, "verbose trace system")
 	flag.Parse()
-	cmd := exec.Command("whoami")
-	var out bytes.Buffer
-	cmd.Stdout = &out
-	err := cmd.Run()
-	if err != nil {
-		fmt.Println(err)
-	}
-	fmt.Println(out.String())
 	udpAddr, _ := net.ResolveUDPAddr("udp4", "127.0.0.1:5999")
 	udpConn, _ := net.ListenUDP("udp4", udpAddr)
 	centralServer := CentralServer{
@@ -445,7 +435,10 @@ func (centralServer *CentralServer) readNodes() {
 					}else{
 						fmt.Println("Car " + c.Id + "  is changing position (" + strconv.Itoa(c.X) + ", " + strconv.Itoa(c.Y) + ") -> (" + strconv.Itoa(packet.Position.X) + ", " + strconv.Itoa(packet.Position.Y) + "): " + strconv.Itoa(int(umillisec - centralServer.StartTime)) + " ms.")
 					}
-					
+					c.Messages = append(c.Messages, MessageTrace{
+						Type: "other",
+						Text: fmt.Sprintf("Position changed to %v, %v", int(packet.Position.X), int(packet.Position.Y)),
+					})
 					for _, secondC := range centralServer.Cars {
 						if secondC.X == int(packet.Position.X) && secondC.Y == int(packet.Position.Y) && c.Id != secondC.Id {
 							centralServer.ErrorCounting++
@@ -457,10 +450,6 @@ func (centralServer *CentralServer) readNodes() {
 				centralServer.carsMutex.Lock()
 				c.X = int(packet.Position.X)
 				c.Y = int(packet.Position.Y)
-				c.Messages = append(c.Messages, MessageTrace{
-					Type: "other",
-					Text: fmt.Sprintf("Position changed to %v, %v", c.X, c.Y),
-				})
 				centralServer.Cars[addrString] = c
 				centralServer.carsMutex.Unlock()
 				centralServer.mapMutex.RLock()
