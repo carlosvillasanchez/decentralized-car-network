@@ -30,11 +30,6 @@ func (centralServer *CentralServer) setupAPI(w http.ResponseWriter, r *http.Requ
 		buildings := r.FormValue("buildings")
 		carcrashes := r.FormValue("carcrashes")
 		parkingspots := r.FormValue("parkingspots")
-		fmt.Println("SETTING UP")
-		fmt.Println("Car", cars)
-		fmt.Println("Buildings", buildings)
-		fmt.Println("Carcrash", carcrashes)
-		fmt.Println("ParkingSpot", parkingspots)
 		centralServer.setupCentralServer(cars, buildings, carcrashes, parkingspots)
 		w.Write([]byte("Everything ok.\n"))
 		go centralServer.startProtocol()
@@ -55,7 +50,6 @@ func (centralServer *CentralServer) addCarAPI(w http.ResponseWriter, r *http.Req
 		}
 		//[TODO: Check there is no car there]
 		car := r.FormValue("car")
-		fmt.Println("Adding new car:", car)
 		carSplited := strings.Split(car, ",")
 		x, _ := strconv.Atoi(carSplited[3])
 		y, _ := strconv.Atoi(carSplited[4])

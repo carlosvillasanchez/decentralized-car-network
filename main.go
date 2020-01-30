@@ -34,16 +34,18 @@ const (
 // STRUCTURES:
 
 type CentralServer struct {
-	Cars         map[string]Car
-	carsMutex    sync.RWMutex
-	Buildings    []Building
-	ParkingSpots []ParkingSpot
-	CarCrashes   []CarCrash
-	Map          [10][10]string
-	mapMutex     sync.RWMutex
-	conn         *net.UDPConn
-	Police       bool
-	WT			 bool
+	Cars         	map[string]Car
+	carsMutex    	sync.RWMutex
+	Buildings    	[]Building
+	ParkingSpots 	[]ParkingSpot
+	CarCrashes   	[]CarCrash
+	Map          	[10][10]string
+	mapMutex     	sync.RWMutex
+	conn         	*net.UDPConn
+	Police       	bool
+	WT			 	bool
+	Verbose			bool
+	ErrorCounting 	int
 }
 
 type Car struct {
@@ -94,8 +96,9 @@ type ServerMessage struct {
 
 // MAIN FUNCTION. Starting the server.
 func main() {
-	var webOfTrust bool
+	var webOfTrust, verbose bool
 	flag.BoolVar(&webOfTrust, "wt", false, "add a web of trust")
+	flag.BoolVar(&verbose, "v", false, "verbose trace system")
 	flag.Parse()
 	cmd := exec.Command("whoami")
 	var out bytes.Buffer
@@ -111,6 +114,7 @@ func main() {
 		conn:   udpConn,
 		Police: true,
 		WT: webOfTrust,
+		Verbose: verbose,
 	}
 	go centralServer.readNodes()
 	// ENDPOINTS
@@ -150,7 +154,6 @@ func (centralServer *CentralServer) setupCentralServer(cars string, buildings st
 		}
 		centralServer.carsMutex.Lock()
 		centralServer.Cars = carsDict
-		fmt.Println(centralServer.Cars)
 		centralServer.carsMutex.Unlock()
 	}
 	if buildings != "" {
@@ -198,7 +201,7 @@ func (centralServer *CentralServer) setupCentralServer(cars string, buildings st
 		}
 		centralServer.ParkingSpots = parkingSpotsArray
 	}
-	centralServer.printMap()
+	//centralServer.printMap()
 }
 
 /***
@@ -220,7 +223,7 @@ func (centralServer *CentralServer) mapAddBuildings() {
 		centralServer.Map[building.X][building.Y] = "b"
 	}
 	centralServer.mapMutex.Unlock()
-	centralServer.printMap()
+	//centralServer.printMap()
 }
 
 /***
@@ -232,7 +235,7 @@ func (centralServer *CentralServer) mapAddCarCrashes() {
 		centralServer.Map[carCrash.X][carCrash.Y] = "cc"
 	}
 	centralServer.mapMutex.Unlock()
-	centralServer.printMap()
+	//centralServer.printMap()
 }
 
 /***
@@ -244,7 +247,7 @@ func (centralServer *CentralServer) mapAddParkingSpots() {
 		centralServer.Map[parkingSpot.X][parkingSpot.Y] = "p"
 	}
 	centralServer.mapMutex.Unlock()
-	centralServer.printMap()
+	//centralServer.printMap()
 }
 
 /***
@@ -334,8 +337,6 @@ func (centralServer *CentralServer) startNodes() {
 
 	budgetParking = int(len(centralServer.Cars)/6) + 1
 	
-	fmt.Println("PRODUCERS: ", producers)
-	fmt.Println("NUMBER OF NODES:", len(flags))
 	for _, flag_array := range flags {
 		parking := false
 		if budgetParking != 0 && flag_array[2] != "police" {
@@ -402,7 +403,7 @@ func (centralServer *CentralServer) startNode(flags []string, areas map[string][
 			signatures[id] = signature
 		}
 	}
-	carDecentralized.Start(&flags[0], &flags[1], &flags[2], &flags[3], &antiEntropy, &rTimer, &flags[6], &flags[7], &neighbours, &parking, sk, pk, policePk, centralServer.WT, trustIn, pksTrust, signatures)
+	carDecentralized.Start(&flags[0], &flags[1], &flags[2], &flags[3], &antiEntropy, &rTimer, &flags[6], &flags[7], &neighbours, &parking, sk, pk, policePk, centralServer.WT, trustIn, pksTrust, signatures, centralServer.Verbose)
 
 }
 
@@ -426,6 +427,15 @@ func (centralServer *CentralServer) readNodes() {
 			c, ok := centralServer.Cars[addrString]
 			centralServer.carsMutex.RUnlock()
 			if ok {
+				if c.X != int(packet.Position.X) || c.Y != int(packet.Position.Y) {
+					for _, secondC := range centralServer.Cars {
+						if secondC.X == int(packet.Position.X) && secondC.Y == int(packet.Position.Y) && c.Id != secondC.Id {
+							centralServer.ErrorCounting++
+							fmt.Println("Car " + c.Id + " crashed with car " +  secondC.Id + ". Error count: " + strconv.Itoa(centralServer.ErrorCounting))
+							break
+						}
+					}
+				}
 				centralServer.carsMutex.Lock()
 				c.X = int(packet.Position.X)
 				c.Y = int(packet.Position.Y)
@@ -447,7 +457,7 @@ func (centralServer *CentralServer) readNodes() {
 			}
 		} else if packet.Trace != nil {
 			centralServer.carsMutex.Lock()
-			fmt.Println("IT IS A TRACE FROM", addrString, "NAME", centralServer.Cars[addrString].Id, "TYPE", packet.Trace.Type, "TEXT", packet.Trace.Text)
+			//fmt.Println("IT IS A TRACE FROM", addrString, "NAME", centralServer.Cars[addrString].Id, "TYPE", packet.Trace.Type, "TEXT", packet.Trace.Text)
 			c, ok := centralServer.Cars[addrString]
 			if ok {
 				c.Messages = append(c.Messages, *packet.Trace)

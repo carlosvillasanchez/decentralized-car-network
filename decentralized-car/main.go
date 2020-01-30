@@ -39,10 +39,9 @@ var emptyMap = [][]string{
 	{"N", "N", "N", "N", "N", "N", "N", "N", "N"},
 }
 
-func createPeerster(gossipAddr *string, mapString *string, name *string, peers *string, antiEntropy *int, rTimer *int, startPosition *string, endPosition *string, areaPeers *string, sk rsa.PrivateKey, pk rsa.PublicKey, policePk rsa.PublicKey, WT bool, trustIn []string, pksTrust map[string]rsa.PublicKey, signatures map[string][]byte) gossiper.Peerster {
+func createPeerster(gossipAddr *string, mapString *string, name *string, peers *string, antiEntropy *int, rTimer *int, startPosition *string, endPosition *string, areaPeers *string, sk rsa.PrivateKey, pk rsa.PublicKey, policePk rsa.PublicKey, WT bool, trustIn []string, pksTrust map[string]rsa.PublicKey, signatures map[string][]byte, verbose bool) gossiper.Peerster {
 
 	UIPort := "8080"
-	fmt.Println("STARTING!!", trustIn)
 	simple := false
 
 	for _, trust := range trustIn {
@@ -97,6 +96,7 @@ func createPeerster(gossipAddr *string, mapString *string, name *string, peers *
 		Pk:               pk,
 		PolicePk:         policePk,
 		WT:               WT,
+		Verbose: 		  verbose,
 		TrustedCars:      trustIn,
 		PksOfTrustedCars: pksTrust,
 		Signatures:       signatures,
@@ -148,12 +148,11 @@ func init() {
 	rand.Seed(time.Now().UTC().UnixNano())
 }
 
-func Start(gossipAddr *string, mapString *string, name *string, peers *string, antiEntropy *int, rTimer *int, startPosition *string, endPosition *string, areaPeers *string, parkingSearch *bool, sk rsa.PrivateKey, pk rsa.PublicKey, policePk rsa.PublicKey, WT bool, trustIn []string, pksTrust map[string]rsa.PublicKey, signatures map[string][]byte) {
-	peerster := createPeerster(gossipAddr, mapString, name, peers, antiEntropy, rTimer, startPosition, endPosition, areaPeers, sk, pk, policePk, WT, trustIn, pksTrust, signatures)
-	fmt.Println(*name)
-	for _, value := range peerster.PosCarsInArea.Slice {
+func Start(gossipAddr *string, mapString *string, name *string, peers *string, antiEntropy *int, rTimer *int, startPosition *string, endPosition *string, areaPeers *string, parkingSearch *bool, sk rsa.PrivateKey, pk rsa.PublicKey, policePk rsa.PublicKey, WT bool, trustIn []string, pksTrust map[string]rsa.PublicKey, signatures map[string][]byte, verbose bool) {
+	peerster := createPeerster(gossipAddr, mapString, name, peers, antiEntropy, rTimer, startPosition, endPosition, areaPeers, sk, pk, policePk, WT, trustIn, pksTrust, signatures, verbose)
+	/*for _, value := range peerster.PosCarsInArea.Slice {
 		fmt.Printf("%+v\n", value)
-	}
+	}*/
 	peerster.SubscribeToNewsgroup(strconv.Itoa(utils.AreaPositioner(peerster.PathCar[0])))
 	if *parkingSearch {
 		peerster.SubscribeToNewsgroup(gossiper.ParkingNewsGroup)
@@ -177,31 +176,33 @@ func Start(gossipAddr *string, mapString *string, name *string, peers *string, a
 			peerster.SendAreaChangeMessage(peerster.PathCar[0])
 		}
 	}()
-	go func() {
-		for {
-			time.Sleep(time.Duration(4) * time.Second)
-			peerster.SendTrace(utils.MessageTrace{
-				Type: utils.Police,
-				Text: fmt.Sprintf("Path status %v", peerster.PathCar),
-			})
-			peerster.SendTrace(utils.MessageTrace{
-				Type: utils.Police,
-				Text: fmt.Sprintf("Status area %v", peerster.AreaChangeSession.Active),
-			})
-			for _, value := range peerster.PosCarsInArea.Slice {
-
+	if verbose {
+		go func() {
+			for {
+				time.Sleep(time.Duration(4) * time.Second)
 				peerster.SendTrace(utils.MessageTrace{
 					Type: utils.Police,
-					Text: fmt.Sprintf("Car %v: knowing %v", peerster.Name, value),
+					Text: fmt.Sprintf("Path status %v", peerster.PathCar),
 				})
-			}
-			peerster.SendTrace(utils.MessageTrace{
-				Type: utils.Police,
-				Text: fmt.Sprintf("-------------------------------------------"),
-			})
+				peerster.SendTrace(utils.MessageTrace{
+					Type: utils.Police,
+					Text: fmt.Sprintf("Status area %v", peerster.AreaChangeSession.Active),
+				})
+				for _, value := range peerster.PosCarsInArea.Slice {
 
-		}
-	}()
+					peerster.SendTrace(utils.MessageTrace{
+						Type: utils.Police,
+						Text: fmt.Sprintf("Car %v: knowing %v", peerster.Name, value),
+					})
+				}
+				peerster.SendTrace(utils.MessageTrace{
+					Type: utils.Police,
+					Text: fmt.Sprintf("-------------------------------------------"),
+				})
+
+			}
+		}()
+	}
 	//Rutine that sends information to the server
 	peerster.SendInfoToServer()
 	// peerster.Listen(gossiper.Client)

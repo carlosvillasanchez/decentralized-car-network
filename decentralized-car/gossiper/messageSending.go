@@ -117,7 +117,6 @@ func (peerster *Peerster) SendNegotiationMessage() {
 	packet := messaging.GossipPacket{
 		Colision: &colisionMessage,
 	}
-	fmt.Println("ICIII", packet.Colision != nil)
 	var blacklist []string
 	peerster.sendToPeer(peerster.ColisionInfo.IPCar, packet, blacklist)
 }

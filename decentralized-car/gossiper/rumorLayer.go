@@ -1,7 +1,7 @@
 package gossiper
 
 import (
-	"fmt"
+	//"fmt"
 	"strconv"
 	"sync"
 
@@ -102,7 +102,7 @@ func (peerster *Peerster) handleIncomingFreeSpotMessage(message messaging.RumorM
 			return
 		}
 	}
-	fmt.Println("DDDDDDDDDDDDDDDDD")
+	//fmt.Println("DDDDDDDDDDDDDDDDD")
 	request := messaging.SpotPublicationRequest{
 		Position: message.SpotPublishMessage.Position,
 	}
@@ -115,9 +115,9 @@ func (peerster *Peerster) handleIncomingFreeSpotMessage(message messaging.RumorM
 		Destination:            message.Origin,
 		SpotPublicationRequest: &request,
 	}
-	fmt.Println("GGGGGGGGGGGGG")
+	/*fmt.Println("GGGGGGGGGGGGG")
 	fmt.Printf("%v \n", request)
-	fmt.Printf("%v \n", spotRequest.Destination)
+	fmt.Printf("%v \n", spotRequest.Destination)*/
 	peerster.sendNewPrivateMessage(spotRequest)
 	peerster.PostulatedAlready = true
 }

@@ -40,12 +40,6 @@ func (peerster *Peerster) MoveCarPosition() {
 			meanTime := MovementTimer * 1000
 			randomness := rand.Intn(500)
 			time.Sleep(time.Duration(meanTime+randomness) * time.Millisecond) //TODO moved this out of the if, si that ok?
-			for _, value := range peerster.PosCarsInArea.Slice {
-				peerster.SendTrace(utils.MessageTrace{
-					Type: utils.Other,
-					Text: fmt.Sprintf("Car %v: knowing %v", peerster.Name, value),
-				})
-			}
 			if peerster.PathCar != nil && !peerster.isLastPosition() {
 				areaChange := peerster.changeOfArea()
 				//There is a change in the area zone, so different procedure
@@ -86,23 +80,23 @@ func (peerster *Peerster) startAreaChangeSession() {
 	select {
 	case value := <-peerster.AreaChangeSession.Channel:
 		if value {
-			peerster.SendTrace(utils.MessageTrace{
+			/*peerster.SendTrace(utils.MessageTrace{
 				Type: utils.Other,
 				Text: fmt.Sprintf("AAAAAAAAAAAAAAAAAAA"),
-			})
+			})*/
 			return
 		} else {
 			peerster.AreaChangeSession.Active = false
-			peerster.SendTrace(utils.MessageTrace{
+			/*peerster.SendTrace(utils.MessageTrace{
 				Type: utils.Other,
 				Text: fmt.Sprintf("BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"),
-			})
+			})*/
 		}
 	case <-time.After(AreaChangeTimer * time.Second):
-		peerster.SendTrace(utils.MessageTrace{
+		/*peerster.SendTrace(utils.MessageTrace{
 			Type: utils.Other,
 			Text: fmt.Sprintf("CCCCCCCCCCCCCCCCCCCCCCCCCCCCC"),
-		})
+		})*/
 		// peerster.UnsubscribeFromNewsgroup(strconv.Itoa(utils.AreaPositioner(peerster.PathCar[0])))
 		// peerster.SubscribeToNewsgroup(strconv.Itoa(utils.AreaPositioner(peerster.PathCar[1])))
 		peerster.positionAdvancer()
@@ -127,7 +121,7 @@ func (peerster *Peerster) positionAdvancer() {
 			peerster.SubscribeToNewsgroup(strconv.Itoa(utils.AreaPositioner(peerster.PathCar[1])))
 		}
 		peerster.PathCar = peerster.PathCar[1:]
-		fmt.Println(peerster.PathCar)
+		//fmt.Println(peerster.PathCar)
 		peerster.BroadcastCarPosition()
 		peerster.SendPosToServer()
 		// There is a colision, do something
@@ -150,10 +144,10 @@ func (peerster *Peerster) collisionChecker() bool {
 		if peerster.PathCar[1] == carInfo.Position {
 			peerster.ColisionInfo.NumberColisions = peerster.ColisionInfo.NumberColisions + 1
 			peerster.ColisionInfo.IPCar = carInfo.IPCar
-			fmt.Println("-------------------------")
+			/*fmt.Println("-------------------------")
 			fmt.Println(peerster.ColisionInfo.NumberColisions)
 			fmt.Printf("CAR INFO: %+v \n", carInfo)
-			fmt.Println(peerster.ColisionInfo.IPCar)
+			fmt.Println(peerster.ColisionInfo.IPCar)*/
 			return true
 		}
 	}

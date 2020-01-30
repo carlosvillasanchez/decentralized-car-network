@@ -55,6 +55,7 @@ type Peerster struct {
 	Pk                rsa.PublicKey
 	PolicePk          rsa.PublicKey
 	WT                bool
+	Verbose 		  bool
 	TrustedCars       []string
 	PksOfTrustedCars  map[string]rsa.PublicKey
 	Signatures        map[string][]byte
@@ -215,9 +216,9 @@ func (peerster *Peerster) handleIncomingRumor(rumor *messaging.RumorMessage, ori
 		selectedPeer, err := peerster.sendToRandomPeer(messaging.GossipPacket{Rumor: rumor}, []string{})
 		peer = selectedPeer
 		if err != nil {
-			fmt.Printf("Warning: Could not send to random peer. Reason: %s \n", err)
-			fmt.Println("peer: ", peer)
-			fmt.Printf("%+v\n", messaging.GossipPacket{Rumor: rumor})
+			//fmt.Printf("Warning: Could not send to random peer. Reason: %s \n", err)
+			//fmt.Println("peer: ", peer)
+			//fmt.Printf("%+v\n", messaging.GossipPacket{Rumor: rumor})
 			return ""
 		}
 		peerster.stopRumormongeringSession(peer)
@@ -442,7 +443,6 @@ func (peerster *Peerster) handleIncomingAccidentMessage(alertToPolice *messaging
 		return
 	}
 	plainText, _ := rsa.DecryptPKCS1v15(randCrytpo.Reader, &peerster.Sk, *alertToPolice.AlertPoliceCar)
-	fmt.Printf("RECEIVING To POLICE %x\n", plainText)
 	// Dcoding the GossipPacket
 	alertObject := &messaging.AlertPolice{}
 	err := protobuf.Decode(plainText, alertObject)
@@ -495,7 +495,6 @@ func (peerster *Peerster) handleIncomingServerAccidentMessage(alertMessage *util
 	alert.Origin = peerster.Name
 	objectBytes, _ := protobuf.Encode(&alert)
 	ciphertext, _ := rsa.EncryptPKCS1v15(randCrytpo.Reader, &peerster.PolicePk, objectBytes)
-	fmt.Printf("SENDING To POLICE %x\n", objectBytes)
 	privateAlert := messaging.PrivateMessage{
 		AlertPoliceCar: &ciphertext,
 		Destination:    "police",
@@ -711,7 +710,7 @@ func (peerster *Peerster) handleIncomingPrivateMessage(message *messaging.Privat
 		return
 	}
 	if message.Destination == peerster.Name {
-		fmt.Printf("PRIVATE origin %s hop-limit %v contents %s \n", message.Origin, message.HopLimit, message.Text)
+		//fmt.Printf("PRIVATE origin %s hop-limit %v contents %s \n", message.Origin, message.HopLimit, message.Text)
 		peerster.addToPrivateMessages(*message)
 		//peerster.handleIncomingAreaChangeResponse(*message.AreaChangeResponse)
 	} else {
@@ -819,6 +818,9 @@ func (peerster *Peerster) considerRumormongering() bool {
 func (peerster *Peerster) chooseRandomPeer() (string, error) {
 	var validPeers []string
 	for i := range peerster.KnownPeers {
+		if i >= len(peerster.KnownPeers){
+			break
+		}
 		peer := peerster.KnownPeers[i]
 		if peer != peerster.GossipAddress {
 			validPeers = append(validPeers, peer)
@@ -844,9 +846,6 @@ func (peerster *Peerster) serverReceive(buffer []byte, originAddr net.UDPAddr) {
 			addr = receivedPacket.Simple.RelayPeerAddr
 		}
 		peerster.addToKnownPeers(addr)
-		if receivedPacket.Colision != nil {
-			fmt.Println("AJA!")
-		}
 		//Function only checked by police car
 		if peerster.Name == utils.Police {
 			peerster.handleIncomingAccidentMessage(receivedPacket.Private)
@@ -908,7 +907,6 @@ func (peerster *Peerster) Listen(origin Origin) {
 	if err != nil {
 		log.Fatalf("Error: could not listen. Origin: %s, error: %s \n", origin, err)
 	}
-	fmt.Println("SERVER", Server)
 	if origin == Server {
 		peerster.Conn = conn
 	}
@@ -1063,9 +1061,6 @@ func (peerster Peerster) sendToPeer(peer string, packet messaging.GossipPacket, 
 	}
 	if packet.Rumor != nil {
 		//fmt.Printf("MONGERING with %s \n", peer)
-	}
-	if packet.Colision != nil {
-		fmt.Println("AJA 2")
 	}
 	peerAddr := utils.StringAddrToUDPAddr(peer)
 	packetBytes, err := protobuf.Encode(&packet)
