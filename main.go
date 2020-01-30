@@ -46,6 +46,7 @@ type CentralServer struct {
 	WT			 	bool
 	Verbose			bool
 	ErrorCounting 	int
+	StartTime	  	int64
 }
 
 type Car struct {
@@ -115,6 +116,8 @@ func main() {
 		Police: true,
 		WT: webOfTrust,
 		Verbose: verbose,
+		StartTime: 0,
+
 	}
 	go centralServer.readNodes()
 	// ENDPOINTS
@@ -337,6 +340,12 @@ func (centralServer *CentralServer) startNodes() {
 
 	budgetParking = int(len(centralServer.Cars)/6) + 1
 	
+	// Saving the time
+	now := time.Now()
+	unixNano := now.UnixNano()                                                                      
+    umillisec := unixNano / 1000000  
+	centralServer.StartTime = umillisec
+	
 	for _, flag_array := range flags {
 		parking := false
 		if budgetParking != 0 && flag_array[2] != "police" {
@@ -428,10 +437,19 @@ func (centralServer *CentralServer) readNodes() {
 			centralServer.carsMutex.RUnlock()
 			if ok {
 				if c.X != int(packet.Position.X) || c.Y != int(packet.Position.Y) {
+					now := time.Now()
+					unixNano := now.UnixNano()                                                                      
+					umillisec := unixNano / 1000000
+					if len(c.Id) > 1{
+						fmt.Println("Car " + c.Id + " is changing position (" + strconv.Itoa(c.X) + ", " + strconv.Itoa(c.Y) + ") -> (" + strconv.Itoa(packet.Position.X) + ", " + strconv.Itoa(packet.Position.Y) + "): " + strconv.Itoa(int(umillisec - centralServer.StartTime)) + " ms.")	
+					}else{
+						fmt.Println("Car " + c.Id + "  is changing position (" + strconv.Itoa(c.X) + ", " + strconv.Itoa(c.Y) + ") -> (" + strconv.Itoa(packet.Position.X) + ", " + strconv.Itoa(packet.Position.Y) + "): " + strconv.Itoa(int(umillisec - centralServer.StartTime)) + " ms.")
+					}
+					
 					for _, secondC := range centralServer.Cars {
 						if secondC.X == int(packet.Position.X) && secondC.Y == int(packet.Position.Y) && c.Id != secondC.Id {
 							centralServer.ErrorCounting++
-							fmt.Println("Car " + c.Id + " crashed with car " +  secondC.Id + ". Error count: " + strconv.Itoa(centralServer.ErrorCounting))
+							fmt.Println("\tCar " + c.Id + " crashed with car " +  secondC.Id + ". Error count: " + strconv.Itoa(centralServer.ErrorCounting) + "\n")
 							break
 						}
 					}
