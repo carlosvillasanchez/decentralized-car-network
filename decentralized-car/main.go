@@ -173,7 +173,7 @@ func Start(gossipAddr *string, mapString *string, name *string, peers *string, a
 	//Rumors the car position in the current area of the car
 	go func() {
 		for {
-			time.Sleep(time.Duration(4) * time.Second)
+			time.Sleep(time.Duration(2) * time.Second)
 			peerster.SendAreaChangeMessage(peerster.PathCar[0])
 		}
 	}()

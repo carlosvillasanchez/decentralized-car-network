@@ -103,8 +103,8 @@ func (peerster *Peerster) startAreaChangeSession() {
 			Type: utils.Other,
 			Text: fmt.Sprintf("CCCCCCCCCCCCCCCCCCCCCCCCCCCCC"),
 		})
-		peerster.UnsubscribeFromNewsgroup(strconv.Itoa(utils.AreaPositioner(peerster.PathCar[0])))
-		peerster.SubscribeToNewsgroup(strconv.Itoa(utils.AreaPositioner(peerster.PathCar[1])))
+		// peerster.UnsubscribeFromNewsgroup(strconv.Itoa(utils.AreaPositioner(peerster.PathCar[0])))
+		// peerster.SubscribeToNewsgroup(strconv.Itoa(utils.AreaPositioner(peerster.PathCar[1])))
 		peerster.positionAdvancer()
 		peerster.AreaChangeSession.Active = false
 	}
@@ -122,7 +122,7 @@ func (peerster *Peerster) positionAdvancer() {
 
 	if peerster.collisionChecker() == false {
 		//If the car is changing from area subscribe to the new one
-		if utils.AreaPositioner(peerster.PathCar[0]) != utils.AreaPositioner(peerster.PathCar[1]) {
+		if peerster.changeOfArea() {
 			peerster.UnsubscribeFromNewsgroup(strconv.Itoa(utils.AreaPositioner(peerster.PathCar[0])))
 			peerster.SubscribeToNewsgroup(strconv.Itoa(utils.AreaPositioner(peerster.PathCar[1])))
 		}

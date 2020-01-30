@@ -25,10 +25,10 @@ const (
 	Client           Origin        = iota
 	Server           Origin        = iota
 	TIMEOUTCARS      time.Duration = 15
-	TIMEOUTSPOTS     time.Duration = 10
+	TIMEOUTSPOTS     time.Duration = 6
 	IMAGEACCIDENT    string        = "accident.jpg"
 	BroadcastTimer   int           = 1 //Each 1 second the car broadcast position
-	MovementTimer    int           = 2
+	MovementTimer    int           = 3
 	AreaChangeTimer  time.Duration = 5
 	ParkingNewsGroup string        = "parking"
 )
@@ -633,6 +633,11 @@ func (peerster *Peerster) colisionLogicManager(hisCoinFlip int) {
 
 			carPathAux = CreatePath(peerster.CarMap, peerster.PathCar[0], peerster.PathCar[len(peerster.PathCar)-1], obstructions)
 			if (carPathAux == nil) || (len(carPathAux) == 0) {
+				isnil = true
+				time.Sleep(time.Duration(1) * time.Second)
+			}
+			// To avoid the path full of 0
+			if (len(carPathAux) > 1) && ((carPathAux[0].X == 0) && (carPathAux[0].Y == 0)) {
 				isnil = true
 				time.Sleep(time.Duration(1) * time.Second)
 			}
