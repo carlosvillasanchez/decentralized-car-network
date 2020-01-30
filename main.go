@@ -44,6 +44,7 @@ type CentralServer struct {
 	WT            bool
 	Verbose       bool
 	ErrorCounting int
+	MovesCounting int
 	StartTime     int64
 }
 
@@ -102,11 +103,12 @@ func main() {
 	udpAddr, _ := net.ResolveUDPAddr("udp4", "127.0.0.1:5999")
 	udpConn, _ := net.ListenUDP("udp4", udpAddr)
 	centralServer := CentralServer{
-		conn:      udpConn,
-		Police:    true,
-		WT:        webOfTrust,
-		Verbose:   verbose,
-		StartTime: 0,
+		conn:          udpConn,
+		Police:        true,
+		WT:            webOfTrust,
+		Verbose:       verbose,
+		MovesCounting: 0,
+		StartTime:     0,
 	}
 	go centralServer.readNodes()
 	// ENDPOINTS
@@ -339,7 +341,7 @@ func (centralServer *CentralServer) startNodes() {
 		parking := false
 		if budgetParking != 0 && flag_array[2] != "police" {
 			parking = true
-			//budgetParking--
+			budgetParking--
 		}
 		go centralServer.startNode(flag_array, areas, parking, sks, pks, producers)
 		time.Sleep(time.Millisecond * 200)
@@ -426,13 +428,14 @@ func (centralServer *CentralServer) readNodes() {
 			centralServer.carsMutex.RUnlock()
 			if ok {
 				if c.X != int(packet.Position.X) || c.Y != int(packet.Position.Y) {
+					centralServer.MovesCounting++
 					now := time.Now()
 					unixNano := now.UnixNano()
 					umillisec := unixNano / 1000000
 					if len(c.Id) > 1 {
-						fmt.Println("Car " + c.Id + " is changing position (" + strconv.Itoa(c.X) + ", " + strconv.Itoa(c.Y) + ") -> (" + strconv.Itoa(packet.Position.X) + ", " + strconv.Itoa(packet.Position.Y) + "): " + strconv.Itoa(int(umillisec-centralServer.StartTime)) + " ms.")
+						fmt.Println("Car " + c.Id + " is changing position (" + strconv.Itoa(c.X) + ", " + strconv.Itoa(c.Y) + ") -> (" + strconv.Itoa(packet.Position.X) + ", " + strconv.Itoa(packet.Position.Y) + "): " + strconv.Itoa(int(umillisec-centralServer.StartTime)) + " ms, " + strconv.Itoa(centralServer.MovesCounting) + " moves. (" + strconv.FormatFloat((float64(centralServer.ErrorCounting)/float64(centralServer.MovesCounting)), 'E', -1, 64) + ")")
 					} else {
-						fmt.Println("Car " + c.Id + "  is changing position (" + strconv.Itoa(c.X) + ", " + strconv.Itoa(c.Y) + ") -> (" + strconv.Itoa(packet.Position.X) + ", " + strconv.Itoa(packet.Position.Y) + "): " + strconv.Itoa(int(umillisec-centralServer.StartTime)) + " ms.")
+						fmt.Println("Car " + c.Id + "  is changing position (" + strconv.Itoa(c.X) + ", " + strconv.Itoa(c.Y) + ") -> (" + strconv.Itoa(packet.Position.X) + ", " + strconv.Itoa(packet.Position.Y) + "): " + strconv.Itoa(int(umillisec-centralServer.StartTime)) + " ms, " + strconv.Itoa(centralServer.MovesCounting) + " moves. (" + strconv.FormatFloat((float64(centralServer.ErrorCounting)/float64(centralServer.MovesCounting)), 'E', -1, 64) + ")")
 					}
 					c.Messages = append(c.Messages, MessageTrace{
 						Type: "other",
