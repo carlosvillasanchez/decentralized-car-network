@@ -690,6 +690,9 @@ func (peerster *Peerster) getMissingMessages(theirNextId, myNextId uint32, origi
 	peerster.ReceivedMessages.Mutex.RLock()
 	for i := theirNextId - 1; i < myNextId-1; i++ {
 		//fmt.Println("i: ", i)
+		if int(i) >= len(peerster.ReceivedMessages.Map[origin]) {
+			break
+		}
 		messages = append(messages, peerster.ReceivedMessages.Map[origin][i])
 	}
 	peerster.ReceivedMessages.Mutex.RUnlock()
