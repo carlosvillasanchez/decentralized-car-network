@@ -1,5 +1,9 @@
 package simulator
 
+/*
+	The code of the simulator is the "main.go" file and not this file. This is a utils for the cars
+*/
+
 import (
 	"log"
 	"net"

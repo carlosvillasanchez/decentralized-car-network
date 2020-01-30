@@ -39,7 +39,7 @@ func (peerster *Peerster) MoveCarPosition() {
 			// If it is a police car stopped don't do anything
 			meanTime := MovementTimer * 1000
 			randomness := rand.Intn(500)
-			time.Sleep(time.Duration(meanTime+randomness) * time.Millisecond) //TODO moved this out of the if, si that ok?
+			time.Sleep(time.Duration(meanTime+randomness) * time.Millisecond) 
 			if peerster.PathCar != nil && !peerster.isLastPosition() {
 				areaChange := peerster.changeOfArea()
 				//There is a change in the area zone, so different procedure
@@ -168,7 +168,7 @@ func (peerster *Peerster) NegotiationCoinflip() int {
 }
 func (peerster *Peerster) negotationOfColision() {
 	// You flip a coin and send the information to the other guy
-	//TODO: We have to add that if you are trying to change area,
+	// TODO: We have to add that if you are trying to change area,
 	// and another guy from your current area wants to negotiate with you, you always win and stay still
 	coinFlip := peerster.NegotiationCoinflip()
 	peerster.ColisionInfo.CoinFlip = coinFlip

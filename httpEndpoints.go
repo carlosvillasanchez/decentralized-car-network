@@ -48,7 +48,6 @@ func (centralServer *CentralServer) addCarAPI(w http.ResponseWriter, r *http.Req
             fmt.Fprintf(w, "ParseForm() err: %v", err)
             return
 		}
-		//[TODO: Check there is no car there]
 		car := r.FormValue("car")
 		carSplited := strings.Split(car, ",")
 		x, _ := strconv.Atoi(carSplited[3])
@@ -84,7 +83,6 @@ func (centralServer *CentralServer) addParkingSpotAPI(w http.ResponseWriter, r *
             fmt.Fprintf(w, "ParseForm() err: %v", err)
             return
 		}
-		//[TODO: Check there it can be there]
 		parkingSpot := r.FormValue("parkingSpot")
 		fmt.Println("Adding new parking spot:", parkingSpot)
 		parkingSpotSplitted := strings.Split(parkingSpot, ",")
@@ -116,7 +114,6 @@ func (centralServer *CentralServer) addCarCrashAPI(w http.ResponseWriter, r *htt
             fmt.Fprintf(w, "ParseForm() err: %v", err)
             return
 		}
-		//[TODO: Check there it can be there]
 		carCrash := r.FormValue("carCrash")
 		fmt.Println("Adding new car crash:", carCrash)
 		carCrashSplitted := strings.Split(carCrash, ",")
@@ -151,7 +148,6 @@ func (centralServer *CentralServer) updateAPI(w http.ResponseWriter, r *http.Req
 	case "GET":
 		toSendPos := make(map[string][]int)
 		toSendMessages := make(map[string][]MessageTrace)
-		//[TODO: Change this for a read lock, and remove the test code.]
 		centralServer.carsMutex.Lock()
 		for k, v := range centralServer.Cars {
 			toSendPos[v.Id] = []int{v.X, v.Y, v.DestinationX, v.DestinationY}
@@ -183,8 +179,6 @@ func (centralServer *CentralServer) updateAPI(w http.ResponseWriter, r *http.Req
 func (centralServer *CentralServer) stopAPI(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case "POST":
-		// [TODO: STOP THE NETWORK]
-		// [TODO: CLEAN THE CENTRAL SERVER ATRIBUTES]
 		fmt.Println("STOPING!")
 		w.Write([]byte("Everything ok.\n"))
 	}	

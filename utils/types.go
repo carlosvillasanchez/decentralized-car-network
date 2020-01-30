@@ -28,7 +28,7 @@ type MessageTrace struct {
 	Type string
 	Text string
 }
-type Position struct { // TODO will probably be defined elsewhere
+type Position struct {
 	X int
 	Y int
 }

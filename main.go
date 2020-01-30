@@ -85,7 +85,7 @@ type MessageTrace struct {
 	Type string
 	Text string
 }
-type Position struct { // TODO will probably be defined elsewhere
+type Position struct {
 	X int
 	Y int
 }
@@ -420,7 +420,6 @@ func (centralServer *CentralServer) readNodes() {
 
 		protobuf.Decode(buffer[0:n], packet)
 		addrString := addr.String()
-		//[TODO: WHEN A CARCRASH OR PARKING SPOT DISAPPEARS.]
 		if packet.Position != nil {
 			centralServer.carsMutex.RLock()
 			//fmt.Println("IT IS A POSITION FROM", addrString, "NAME", centralServer.Cars[addrString].Id, ": X", packet.Position.X, "Y", packet.Position.Y)
