@@ -113,6 +113,10 @@ func (peerster *Peerster) downloadData(peerIdentifiers []string, previousDownloa
 	index := string(hash)
 	if previousDownloadSession.Metafile != nil {
 		fmt.Printf("DOWNLOADING %s chunk %v from %s \n", previousDownloadSession.FileName, previousDownloadSession.CurrentChunk+1, peerIdentifier)
+		peerster.SendTrace(utils.MessageTrace{
+			Type: utils.Police,
+			Text: fmt.Sprintf("DOWNLOADING %s chunk %v from %s \n", previousDownloadSession.FileName, previousDownloadSession.CurrentChunk+1, peerIdentifier),
+		})
 	} else {
 		fmt.Printf("DOWNLOADING metafile of %s from %s \n", previousDownloadSession.FileName, peerIdentifier)
 	}
@@ -155,6 +159,10 @@ func (peerster *Peerster) downloadData(peerIdentifiers []string, previousDownloa
 		}
 		if peerster.DownloadingFiles.isFullyDownloaded(index) {
 			err := reconstructAndSaveFile(value)
+			peerster.SendTrace(utils.MessageTrace{
+				Type: utils.Police,
+				Text: fmt.Sprintf("RECONSTRUCTED file %s \n", value.FileName),
+			})
 			if err != nil {
 				fmt.Printf("Warning: Could not reconstruct/save file, reason: %s \n", err)
 			} else {

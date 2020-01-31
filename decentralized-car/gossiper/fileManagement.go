@@ -50,6 +50,7 @@ func computeMetafile(chunks [][]byte) (metafile []byte, metafileHash []byte) {
 func reconstructAndSaveFile(downloaded FileBeingDownloaded) error {
 	data := append([]byte{}, downloaded.DownloadedData...)
 	fmt.Printf("RECONSTRUCTED file %s \n", downloaded.FileName)
+
 	return ioutil.WriteFile(DownloadedFilesPath+downloaded.FileName, data, 0644)
 }
 

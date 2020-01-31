@@ -55,7 +55,7 @@ type Peerster struct {
 	Pk                rsa.PublicKey
 	PolicePk          rsa.PublicKey
 	WT                bool
-	Verbose 		  bool
+	Verbose           bool
 	TrustedCars       []string
 	PksOfTrustedCars  map[string]rsa.PublicKey
 	Signatures        map[string][]byte
@@ -499,11 +499,17 @@ func (peerster *Peerster) handleIncomingServerAccidentMessage(alertMessage *util
 		AlertPoliceCar: &ciphertext,
 		Destination:    "police",
 	}
-
-	peerster.SendTrace(utils.MessageTrace{
-		Type: utils.Crash,
-		Text: fmt.Sprintf("Detected an accident at %v, sending report to police", peerster.PathCar[0]),
-	})
+	if peerster.Name != "police" {
+		peerster.SendTrace(utils.MessageTrace{
+			Type: utils.Police,
+			Text: fmt.Sprintf("Detected an accident at %v, sending report to police", peerster.PathCar[0]),
+		})
+	} else {
+		peerster.SendTrace(utils.MessageTrace{
+			Type: utils.Police,
+			Text: fmt.Sprintf("The city is safe, once again. I am the hero they need, not the one they deserve."),
+		})
+	}
 	//privateAlert.AlertPolice= &alert
 	peerster.sendNewPrivateMessage(privateAlert)
 }
@@ -818,7 +824,7 @@ func (peerster *Peerster) considerRumormongering() bool {
 func (peerster *Peerster) chooseRandomPeer() (string, error) {
 	var validPeers []string
 	for i := range peerster.KnownPeers {
-		if i >= len(peerster.KnownPeers){
+		if i >= len(peerster.KnownPeers) {
 			break
 		}
 		peer := peerster.KnownPeers[i]
