@@ -2,7 +2,7 @@
 * Simulation of a Decentralized Network of Autonomous Cars
 * Authors:
 * 	- Torstein Meyer
-* 	- Fernano Monje
+* 	- Fernando Monje
 * 	- Carlos Villa
 ***/
 package simulator
