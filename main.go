@@ -15,11 +15,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dedis/protobuf"
-	"flag"
-	"crypto/rsa"
-	"crypto/rand"
 	"crypto"
+	"crypto/rand"
+	"crypto/rsa"
+	"flag"
+
+	"github.com/dedis/protobuf"
 )
 
 const (
@@ -32,19 +33,20 @@ const (
 // STRUCTURES:
 
 type CentralServer struct {
-	Cars         	map[string]Car
-	carsMutex    	sync.RWMutex
-	Buildings    	[]Building
-	ParkingSpots 	[]ParkingSpot
-	CarCrashes   	[]CarCrash
-	Map          	[10][10]string
-	mapMutex     	sync.RWMutex
-	conn         	*net.UDPConn
-	Police       	bool
-	WT			 	bool
-	Verbose			bool
-	ErrorCounting 	int
-	StartTime	  	int64
+	Cars          map[string]Car
+	carsMutex     sync.RWMutex
+	Buildings     []Building
+	ParkingSpots  []ParkingSpot
+	CarCrashes    []CarCrash
+	Map           [10][10]string
+	mapMutex      sync.RWMutex
+	conn          *net.UDPConn
+	Police        bool
+	WT            bool
+	Verbose       bool
+	ErrorCounting int
+	MovesCounting int
+	StartTime     int64
 }
 
 type Car struct {
@@ -102,12 +104,12 @@ func main() {
 	udpAddr, _ := net.ResolveUDPAddr("udp4", "127.0.0.1:5999")
 	udpConn, _ := net.ListenUDP("udp4", udpAddr)
 	centralServer := CentralServer{
-		conn:   udpConn,
-		Police: true,
-		WT: webOfTrust,
-		Verbose: verbose,
-		StartTime: 0,
-
+		conn:          udpConn,
+		Police:        true,
+		WT:            webOfTrust,
+		Verbose:       verbose,
+		MovesCounting: 0,
+		StartTime:     0,
 	}
 	go centralServer.readNodes()
 	// ENDPOINTS
@@ -316,7 +318,7 @@ func (centralServer *CentralServer) startNodes() {
 			flags_aux = append(flags_aux, strconv.Itoa(int(producer_aux%6/2)))
 			producer_aux++
 
-		}else{
+		} else {
 			flags_aux = append(flags_aux, "police")
 		}
 
@@ -329,13 +331,13 @@ func (centralServer *CentralServer) startNodes() {
 	var budgetParking int
 
 	budgetParking = int(len(centralServer.Cars)/6) + 1
-	
+
 	// Saving the time
 	now := time.Now()
-	unixNano := now.UnixNano()                                                                      
-    umillisec := unixNano / 1000000  
+	unixNano := now.UnixNano()
+	umillisec := unixNano / 1000000
 	centralServer.StartTime = umillisec
-	
+
 	for _, flag_array := range flags {
 		parking := false
 		if budgetParking != 0 && flag_array[2] != "police" {
@@ -368,13 +370,13 @@ func (centralServer *CentralServer) startNode(flags []string, areas map[string][
 			Type: Other,
 			Text: "(" + strconv.Itoa(car.DestinationX) + ", " + strconv.Itoa(car.DestinationY) + ") I am Car " + car.Id + " from producer " + flags[9] + ". I am looking for parking spots!",
 		})
-	}else{
+	} else {
 		car.Messages = append(car.Messages, MessageTrace{
 			Type: Other,
 			Text: "(" + strconv.Itoa(car.DestinationX) + ", " + strconv.Itoa(car.DestinationY) + ") I am Car " + car.Id + " from producer " + flags[9],
 		})
 	}
-	centralServer.Cars[car.IP + ":" + car.Port] = car
+	centralServer.Cars[car.IP+":"+car.Port] = car
 	centralServer.carsMutex.Unlock()
 	antiEntropy, _ := strconv.Atoi(flags[4])
 	rTimer, _ := strconv.Atoi(flags[5])
@@ -395,7 +397,7 @@ func (centralServer *CentralServer) startNode(flags []string, areas map[string][
 			pssh := newhash.New()
 			pssh.Write(toSing)
 			hashed := pssh.Sum(nil)
-			signature, err := rsa.SignPKCS1v15(rand.Reader, &skToSing, newhash, hashed) 
+			signature, err := rsa.SignPKCS1v15(rand.Reader, &skToSing, newhash, hashed)
 			if err != nil {
 				fmt.Println("ERROR SIGNING", err)
 			}
@@ -427,13 +429,14 @@ func (centralServer *CentralServer) readNodes() {
 			centralServer.carsMutex.RUnlock()
 			if ok {
 				if c.X != int(packet.Position.X) || c.Y != int(packet.Position.Y) {
+					centralServer.MovesCounting++
 					now := time.Now()
-					unixNano := now.UnixNano()                                                                      
+					unixNano := now.UnixNano()
 					umillisec := unixNano / 1000000
-					if len(c.Id) > 1{
-						fmt.Println("Car " + c.Id + " is changing position (" + strconv.Itoa(c.X) + ", " + strconv.Itoa(c.Y) + ") -> (" + strconv.Itoa(packet.Position.X) + ", " + strconv.Itoa(packet.Position.Y) + "): " + strconv.Itoa(int(umillisec - centralServer.StartTime)) + " ms.")	
-					}else{
-						fmt.Println("Car " + c.Id + "  is changing position (" + strconv.Itoa(c.X) + ", " + strconv.Itoa(c.Y) + ") -> (" + strconv.Itoa(packet.Position.X) + ", " + strconv.Itoa(packet.Position.Y) + "): " + strconv.Itoa(int(umillisec - centralServer.StartTime)) + " ms.")
+					if len(c.Id) > 1 {
+						fmt.Println("Car " + c.Id + " is changing position (" + strconv.Itoa(c.X) + ", " + strconv.Itoa(c.Y) + ") -> (" + strconv.Itoa(packet.Position.X) + ", " + strconv.Itoa(packet.Position.Y) + "): " + strconv.Itoa(int(umillisec-centralServer.StartTime)) + " ms, " + strconv.Itoa(centralServer.MovesCounting) + " moves. (" + strconv.FormatFloat((float64(centralServer.ErrorCounting)/float64(centralServer.MovesCounting)), 'E', -1, 64) + ")")
+					} else {
+						fmt.Println("Car " + c.Id + "  is changing position (" + strconv.Itoa(c.X) + ", " + strconv.Itoa(c.Y) + ") -> (" + strconv.Itoa(packet.Position.X) + ", " + strconv.Itoa(packet.Position.Y) + "): " + strconv.Itoa(int(umillisec-centralServer.StartTime)) + " ms, " + strconv.Itoa(centralServer.MovesCounting) + " moves. (" + strconv.FormatFloat((float64(centralServer.ErrorCounting)/float64(centralServer.MovesCounting)), 'E', -1, 64) + ")")
 					}
 					c.Messages = append(c.Messages, MessageTrace{
 						Type: "other",
@@ -442,7 +445,7 @@ func (centralServer *CentralServer) readNodes() {
 					for _, secondC := range centralServer.Cars {
 						if secondC.X == int(packet.Position.X) && secondC.Y == int(packet.Position.Y) && c.Id != secondC.Id {
 							centralServer.ErrorCounting++
-							fmt.Println("\tCar " + c.Id + " crashed with car " +  secondC.Id + ". Error count: " + strconv.Itoa(centralServer.ErrorCounting) + "\n")
+							fmt.Println("\tCar " + c.Id + " crashed with car " + secondC.Id + ". Error count: " + strconv.Itoa(centralServer.ErrorCounting) + "\n")
 							break
 						}
 					}
