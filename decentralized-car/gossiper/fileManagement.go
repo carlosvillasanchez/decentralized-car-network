@@ -1,4 +1,12 @@
+/***
+* Simulation of a Decentralized Network of Autonomous Cars
+* Authors:
+* 	- Torstein Meyer
+* 	- Fernano Monje
+* 	- Carlos Villa
+***/
 package gossiper
+
 
 import (
 	"crypto"
