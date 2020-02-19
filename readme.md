@@ -1,5 +1,7 @@
 # Simulation of a Decentralized Network of Autonomous Cars
 
+![Main demo](demos/complex.gif)
+
 As the development of automated, self-driving car technology advances rapidly, the need
 for robust intercommunication between cars grows as well. There are many reasons one would
 want to send messages through a network of self-driving cars - whether it be to warn far-away
@@ -42,4 +44,8 @@ When the simulation starts, the nodes of the network (cars) are launched and sta
 
 In addition, the detection of accidents and parking spots are informed, activating the police (a special node of the system) or, in the case of the parking spots, changing the destination of a car looking for a place to park.
 
-The explanation of the way cars communicate and the assignation of the free parking spots can be read in the report. [Check it out here!](./blob/master/Report.pdf)
+The explanation of the way cars communicate and the assignation of the free parking spots can be read in the report. [Check it out here!](../blob/master/Report.pdf)
+
+## Demos
+
+[Watch four demos here!](../blob/master/demos)
