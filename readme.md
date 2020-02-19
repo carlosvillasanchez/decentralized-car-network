@@ -2,6 +2,8 @@
 
 ![Main demo](demos/complex.gif)
 
+<img src="demos/complex.gif"  width="800" />
+
 As the development of automated, self-driving car technology advances rapidly, the need
 for robust intercommunication between cars grows as well. There are many reasons one would
 want to send messages through a network of self-driving cars - whether it be to warn far-away
