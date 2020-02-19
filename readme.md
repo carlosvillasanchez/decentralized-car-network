@@ -1,8 +1,6 @@
 # Simulation of a Decentralized Network of Autonomous Cars
 
-![Main demo](demos/complex.gif)
-
-<img src="demos/complex.gif"  width="800" />
+<img src="demos/complex.gif"  width="900" />
 
 As the development of automated, self-driving car technology advances rapidly, the need
 for robust intercommunication between cars grows as well. There are many reasons one would
