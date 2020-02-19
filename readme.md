@@ -13,7 +13,7 @@ as the cars move around the map, they have to communicate between each other in 
 achieve certain objectives - e.g. avoid collisions, negotiating between each other, alerting of
 accidents on the road and managing parking spots, everything while they try to reach their target location.
 
-[View here the full report of the project.](./blob/master/Report.pdf)
+[View here the full report of the project.](/Report.pdf)
 The architecture and protocol are explained in detail along with a related work study and future work.
 
 [Visit the front-end code](https://github.com/carlosvillasanchez/decentralized-car-network-UI)
@@ -44,8 +44,8 @@ When the simulation starts, the nodes of the network (cars) are launched and sta
 
 In addition, the detection of accidents and parking spots are informed, activating the police (a special node of the system) or, in the case of the parking spots, changing the destination of a car looking for a place to park.
 
-The explanation of the way cars communicate and the assignation of the free parking spots can be read in the report. [Check it out here!](../blob/master/Report.pdf)
+The explanation of the way cars communicate and the assignation of the free parking spots can be read in the report. [Check it out here!](/Report.pdf)
 
 ## Demos
 
-[Watch four demos here!](../blob/master/demos)
+[Watch four demos here!](/demos)
